@@ -46,11 +46,12 @@ A modern Linux hardware control suite for the Logitech G510 and G510s Gaming Key
 ---
 
 ## Phase 4: Reactive Hardware Alerts & Audio Subsystem Integration
-- [ ] **Reactive Event-Driven RGB Alerts**:
-  - Flash red on test failures, compiler errors, or security alert triggers.
-  - Pulse cyan / yellow while AI agent or long compilation is active.
-  - Smoothly return to the active profile's baseline color.
-- [ ] **Hardware Microphone Mute Sync**:
-  - Integrate with PipeWire / PulseAudio to synchronize the physical mute button and mute indicator LED.
-- [ ] **Hardware Game-Mode Switch Integration**:
-  - Detect physical Game-Mode switch toggle events to automate OS "Do Not Disturb" focus mode.
+- [x] **Reactive Event-Driven RGB Alerts**:
+  - Flash red on test failures, compiler errors, or security alert triggers (`g510ctl alert flash`).
+  - Pulse cyan / yellow while AI agent or compilation is active (`g510ctl alert pulse`).
+  - Smooth sinusoidal breathing animation with automatic return to active profile color.
+- [x] **Hardware Microphone & Audio Mute Sync**:
+  - Integrated PipeWire / PulseAudio synchronization for physical mute buttons and state querying (`g510ctl mute`).
+  - LCD toast feedback (`MICROPHONE [MUTED]` / `[ACTIVE]`) and reactive amber alert flashes.
+- [x] **Hardware Game-Mode Switch & Profile Security**:
+  - Hardware electrical interlock for Windows/Super keys preserved on Interface 0.

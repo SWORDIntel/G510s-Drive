@@ -80,6 +80,29 @@ enum Commands {
         /// Message to display (up to 3 lines)
         message: String,
     },
+    /// Trigger reactive RGB lighting alert (flash or pulse)
+    Alert {
+        /// Alert animation type: flash or pulse
+        #[arg(default_value = "flash")]
+        mode: String,
+        /// Alert color hex (e.g. #ff0000, #00ffff, #00ff00)
+        #[arg(long, default_value = "#ff0000")]
+        color: String,
+        /// Flash repetitions (for flash mode)
+        #[arg(long, default_value_t = 3)]
+        times: u32,
+        /// Pulse duration in seconds (for pulse mode)
+        #[arg(long, default_value_t = 3.0)]
+        duration: f32,
+    },
+    /// Query or toggle microphone / audio mute state
+    Mute {
+        /// Target device: mic or audio
+        target: String,
+        /// Toggle mute state instead of querying
+        #[arg(long)]
+        toggle: bool,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -212,6 +235,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Toast { message } => {
             std::fs::write("/tmp/g510-toast", message)?;
             println!("Toast notification queued for G510 LCD");
+        }
+        Commands::Alert {
+            mode,
+            color,
+            times,
+            duration,
+        } => {
+            let alert_payload = if mode == "pulse" {
+                format!("{{\"type\": \"pulse\", \"color\": \"{color}\", \"duration\": {duration}}}")
+            } else {
+                format!("{{\"type\": \"flash\", \"color\": \"{color}\", \"times\": {times}}}")
+            };
+            std::fs::write("/tmp/g510-alert", alert_payload)?;
+            println!("Alert {mode} ({color}) queued for G510 keyboard");
+        }
+        Commands::Mute { target, toggle } => {
+            match target.to_lowercase().as_str() {
+                "mic" | "microphone" => {
+                    let state = if toggle {
+                        g510::audio::toggle_microphone_mute()
+                    } else {
+                        g510::audio::get_microphone_mute()
+                    };
+                    match state {
+                        Some(muted) => {
+                            println!("Microphone is {}", if muted { "MUTED" } else { "ACTIVE" });
+                        }
+                        None => eprintln!("Could not query microphone state from PipeWire/PulseAudio"),
+                    }
+                }
+                "audio" | "sink" | "speaker" => {
+                    let state = if toggle {
+                        g510::audio::toggle_audio_mute()
+                    } else {
+                        g510::audio::get_audio_mute()
+                    };
+                    match state {
+                        Some(muted) => {
+                            println!("Audio output is {}", if muted { "MUTED" } else { "ACTIVE" });
+                        }
+                        None => eprintln!("Could not query audio sink state from PipeWire/PulseAudio"),
+                    }
+                }
+                other => eprintln!("Unknown mute target '{other}': use 'mic' or 'audio'"),
+            }
         }
     }
 

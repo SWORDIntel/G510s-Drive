@@ -159,6 +159,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             }
                                         }
                                     }
+                                    G510Key::Media(name) if name == "MICROPHONE_MUTE" => {
+                                        let state = g510::audio::toggle_microphone_mute();
+                                        let msg = match state {
+                                            Some(true) => "MICROPHONE\n[ MUTED ]",
+                                            Some(false) => "MICROPHONE\n[ ACTIVE ]",
+                                            None => "MICROPHONE\n[ TOGGLED ]",
+                                        };
+                                        if let Ok(mut t) = toast_keys.lock() {
+                                            *t = Some((msg.to_string(), Instant::now(), Duration::from_millis(1500)));
+                                        }
+                                        if state == Some(true) {
+                                            let restore = if let Ok(eng) = engine_keys.lock() {
+                                                eng.config.profile_rgb.get(&eng.active_profile).cloned().unwrap_or_else(|| "#00dc00".into())
+                                            } else {
+                                                "#00dc00".into()
+                                            };
+                                            thread::spawn(move || {
+                                                g510::alerts::run_flash_alert("#ff8800", 2, &restore);
+                                            });
+                                        }
+                                    }
+                                    G510Key::Media(name) if name == "HEADPHONE_MUTE" => {
+                                        let state = g510::audio::toggle_audio_mute();
+                                        let msg = match state {
+                                            Some(true) => "AUDIO OUTPUT\n[ MUTED ]",
+                                            Some(false) => "AUDIO OUTPUT\n[ ACTIVE ]",
+                                            None => "AUDIO OUTPUT\n[ TOGGLED ]",
+                                        };
+                                        if let Ok(mut t) = toast_keys.lock() {
+                                            *t = Some((msg.to_string(), Instant::now(), Duration::from_millis(1500)));
+                                        }
+                                    }
                                     _ => {
                                         if let Ok(mut eng) = engine_keys.lock() {
                                             eng.handle_key(&key.name());
@@ -217,6 +249,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let _ = fs::remove_file(&toast_file);
                 if let Ok(mut t) = active_toast.lock() {
                     *t = Some((content.trim().to_string(), Instant::now(), Duration::from_secs(3)));
+                }
+            }
+        }
+
+        let alert_file = PathBuf::from("/tmp/g510-alert");
+        if alert_file.exists() {
+            if let Ok(content) = fs::read_to_string(&alert_file) {
+                let _ = fs::remove_file(&alert_file);
+                if let Ok(alert) = serde_json::from_str::<g510::alerts::RgbAlert>(&content) {
+                    let restore = if let Ok(eng) = engine.lock() {
+                        eng.config.profile_rgb.get(&eng.active_profile).cloned().unwrap_or_else(|| "#00dc00".into())
+                    } else {
+                        "#00dc00".into()
+                    };
+                    thread::spawn(move || {
+                        match alert {
+                            g510::alerts::RgbAlert::Flash { color, times } => {
+                                g510::alerts::run_flash_alert(&color, times, &restore);
+                            }
+                            g510::alerts::RgbAlert::Pulse { color, duration } => {
+                                g510::alerts::run_pulse_alert(&color, duration, &restore);
+                            }
+                        }
+                    });
                 }
             }
         }

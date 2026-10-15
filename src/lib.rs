@@ -1,3 +1,5 @@
+pub mod alerts;
+pub mod audio;
 pub mod events;
 pub mod framebuffer;
 pub mod leds;
