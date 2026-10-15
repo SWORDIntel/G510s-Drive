@@ -17,14 +17,14 @@ A modern Linux hardware control suite for the Logitech G510 and G510s Gaming Key
 ---
 
 ## Phase 2: Multi-Page Interactive LCD Ecosystem (160×43 GamePanel)
-- [ ] **Interactive Page Carousel**: Implement multi-page switching driven by physical buttons L1 (Prev), L2 (Next), and L5 (Menu).
-- [ ] **System & Thermal Applet**: Enhanced CPU load graph, per-core utilization, RAM/swap bars, and thermals.
-- [ ] **Network & Tunnel Applet**: Active network interfaces, upload/download speedometers, Wireguard/Tailscale VPN state.
-- [ ] **Security & Lab Ticker**: Failed SSH/PAM attempts in last hour, active QEMU/Proxmox VMs, Docker containers.
-- [ ] **AI Agent Activity Indicator**: Real-time status display for coding assistants and background jobs (`AGENT: THINKING`, `TESTING`, `IDLE`).
-- [ ] **MPRIS Media Player Applet**: Currently playing track, artist name, playback time bar, and volume level from MPRIS/`playerctl`.
+- [x] **Interactive Page Carousel**: Multi-page switching driven by physical buttons L1 (Prev), L2 (Next), and L5 (Menu/Home) + CLI page controls.
+- [x] **System & Thermal Applet**: Live CPU % bar, RAM % bar, thermal sensors (°C), and 1-minute load average.
+- [x] **Network & Tunnel Applet**: Active interface discovery, IP display, live RX/TX rate speedometers (kB/s), and VPN detection.
+- [x] **Security & Lab Ticker**: Failed SSH attempts in last hour, active QEMU/KVM VMs, and Docker container count.
+- [x] **AI Agent Activity Indicator**: Real-time status display for workbench coding assistants (`STATE`, `TASK`, `ROLE`).
+- [x] **MPRIS Media Player Applet**: Currently playing track, artist name, and playback status via `playerctl`.
 - [ ] **Crypto & Node Sync Applet**: Local node block height, sync percentage, and network stats (e.g., Monero daemon).
-- [ ] **Notification Toast Engine**: Brief pop-up overlay on the LCD for desktop notifications and completed long-running commands.
+- [x] **Notification Toast Engine**: Pop-up overlay box on the LCD for desktop notifications and CLI triggers (`g510ctl toast`).
 
 ---
 

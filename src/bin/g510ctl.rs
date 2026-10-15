@@ -70,6 +70,16 @@ enum Commands {
         #[arg(long)]
         config: Option<PathBuf>,
     },
+    /// Switch active LCD carousel page (1=SYS, 2=NET, 3=SEC, 4=MEDIA, 5=AGENT)
+    Page {
+        /// Page number (1-5)
+        number: usize,
+    },
+    /// Display a pop-up toast notification overlay on the LCD
+    Toast {
+        /// Message to display (up to 3 lines)
+        message: String,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -190,6 +200,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
+        }
+        Commands::Page { number } => {
+            if (1..=5).contains(&number) {
+                std::fs::write("/tmp/g510-page", number.to_string())?;
+                println!("Requested carousel switch to page {number}");
+            } else {
+                eprintln!("Invalid page number {number}: must be 1..5 (1=SYS, 2=NET, 3=SEC, 4=MEDIA, 5=AGENT)");
+            }
+        }
+        Commands::Toast { message } => {
+            std::fs::write("/tmp/g510-toast", message)?;
+            println!("Toast notification queued for G510 LCD");
         }
     }
 
