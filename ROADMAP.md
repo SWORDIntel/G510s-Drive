@@ -29,19 +29,19 @@ A modern Linux hardware control suite for the Logitech G510 and G510s Gaming Key
 ---
 
 ## Phase 3: Macro Matrix & Profile Orchestration (54 Slots)
-- [ ] **Profile M1 (Development & Daily Driving — Green `#00dc00`)**:
-  - G1–G6: Workspace and window navigation (IDE, terminal, browser, notes).
-  - G7–G12: Git automation shortcuts (`status`, `diff`, branch switcher, push).
-  - G13–G18: Build, format, lint, and test runner triggers.
-- [ ] **Profile M2 (Workbench & Security Lab — Red `#dc0000`)**:
-  - G1–G6: VM sandbox controls (start/stop VMs, revert disposable snapshots).
-  - G7–G12: Network auditing triggers (toggle Wireguard, launch packet captures).
-  - G13–G18: Fast forensics, memory dump, and triage commands.
-- [ ] **Profile M3 (Communications & Multimedia — Blue `#0000dc`)**:
-  - G1–G6: App quick-launch (Signal, Discord, Browser, Music).
-  - G7–G12: Audio presets, soundboard triggers, and push-to-talk.
-  - G13–G18: Screen capture and recording hotkeys.
-- [ ] **Enhanced MR Recording**: Streamlined on-the-fly macro sequence capture directly into `~/.config/g510s-drive/config.json`.
+- [x] **Profile M1 (Development & Daily Driving — Green `#00dc00`)**:
+  - G1–G6: Workspace and window navigation (Terminal, Konsole, Git status, cargo check, test, release).
+  - G7–G12: Git automation shortcuts, terminal clear, system status toasts, and agent page jump.
+  - G13–G18: Keystroke combos via native `/dev/uinput` (Copy, Paste, Find, Save, Undo, Close Tab).
+- [x] **Profile M2 (Workbench & Security Lab — Red `#dc0000`)**:
+  - G1–G6: Security page jump, network page jump, diagnostic toasts, docker inspection, SSH journal.
+  - G7–G12: Network audit triggers, sandbox checks, snapshot states, and terminal clipboard shortcuts.
+  - G13–G18: Fast forensics, lab triggers, and security monitoring actions.
+- [x] **Profile M3 (Communications & Multimedia — Blue `#0000dc`)**:
+  - G1–G6: Native `playerctl` integration (Play/Pause, Next, Prev, Vol+, Vol-, Media page jump).
+  - G7–G12: Audio mute, mic toggle, screen lock shortcut (`Ctrl+Alt+L`), and communications triggers.
+  - G13–G18: Multimedia presets and custom actions.
+- [x] **Enhanced MR Recording**: On-the-fly macro sequence capture with MR LED feedback and LCD toast confirmation.
 
 ---
 

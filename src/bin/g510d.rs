@@ -131,6 +131,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         }
                                         eprintln!("[g510d] Page -> SYSTEM");
                                     }
+                                    G510Key::Profile(n) => {
+                                        if let Ok(mut eng) = engine_keys.lock() {
+                                            let prof = format!("M{n}");
+                                            eng.activate_profile(&prof);
+                                            let desc = match n {
+                                                1 => "DEV / GENERAL",
+                                                2 => "SECURITY LAB",
+                                                3 => "MULTIMEDIA",
+                                                _ => "CUSTOM",
+                                            };
+                                            if let Ok(mut t) = toast_keys.lock() {
+                                                *t = Some((
+                                                    format!("PROFILE: M{n}\n{desc}"),
+                                                    Instant::now(),
+                                                    Duration::from_millis(1500),
+                                                ));
+                                            }
+                                        }
+                                    }
+                                    G510Key::Mr => {
+                                        if let Ok(mut eng) = engine_keys.lock() {
+                                            if let Some(msg) = eng.toggle_mr() {
+                                                if let Ok(mut t) = toast_keys.lock() {
+                                                    *t = Some((msg, Instant::now(), Duration::from_millis(1500)));
+                                                }
+                                            }
+                                        }
+                                    }
                                     _ => {
                                         if let Ok(mut eng) = engine_keys.lock() {
                                             eng.handle_key(&key.name());
