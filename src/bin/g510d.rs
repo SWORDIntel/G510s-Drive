@@ -107,7 +107,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dyn_pages_keys = Arc::clone(&ipc_state.dynamic_pages);
 
     let _key_thread = thread::spawn(move || {
-        if let Ok((path, mut device)) = find_gaming_device() {
+        let mut dev_opt = None;
+        for _ in 0..10 {
+            if SHUTDOWN.load(Ordering::SeqCst) {
+                return;
+            }
+            if let Ok(pair) = find_gaming_device() {
+                dev_opt = Some(pair);
+                break;
+            }
+            thread::sleep(Duration::from_millis(500));
+        }
+
+        if let Some((path, mut device)) = dev_opt {
             println!("[g510d] Monitoring gaming keys on {}", path.display());
             while !SHUTDOWN.load(Ordering::SeqCst) {
                 if let Ok(events) = device.fetch_events() {
@@ -260,15 +272,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // Open LCD transport
-    let mut transport = match G510Transport::open() {
-        Ok(t) => {
-            println!("[g510d] LCD transport active on {}", t.path().display());
-            t
-        }
-        Err(e) => {
-            eprintln!("[g510d] Error: cannot open LCD transport: {e}");
-            return Err(e.into());
+    // Open LCD transport (retry for up to 10 seconds during system boot)
+    let mut transport = {
+        let mut attempts = 0;
+        loop {
+            match G510Transport::open() {
+                Ok(t) => {
+                    println!("[g510d] LCD transport active on {}", t.path().display());
+                    break t;
+                }
+                Err(e) => {
+                    attempts += 1;
+                    if attempts >= 10 || SHUTDOWN.load(Ordering::SeqCst) {
+                        eprintln!("[g510d] Error: cannot open LCD transport after {attempts} attempts: {e}");
+                        return Err(e.into());
+                    }
+                    eprintln!("[g510d] Waiting for LCD transport ({attempts}/10): {e}...");
+                    thread::sleep(Duration::from_secs(1));
+                }
+            }
         }
     };
 
