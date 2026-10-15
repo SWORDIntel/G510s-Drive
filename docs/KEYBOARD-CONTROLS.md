@@ -138,15 +138,20 @@ python3 -m g510lcd text "MY SCREEN" | build/bin/g510lcd-push --hold
 python3 -m g510lcd status --interval 1 | build/bin/g510lcd-push
 ~~~
 
-The LCD client requires a working G510-compatible g15daemon. Debian's
-stock daemon may lack the fork's USB fixes. The patched legacy build
-is staged, NOT installed. Its original root shell macros are replaced
-by deterministic EV_KEY events during staging. The kernel RGB driver
-and the legacy USB daemon may conflict: combined LCD+RGB+macro
-operation has not been verified on the actual T420. Do not detach
-keyboard HID interfaces or unload the kernel driver blindly.
+The LCD controller receives standard HID Output Report 3 frames directly via
+`/dev/g510-lcd` (Interface 1 `hidraw`). Unlike legacy 2008 `g15daemon` which
+attempted to detach `usbhid`, the native `hidraw` interface preserves `hid-lg-g15`
+in the kernel at all times. Simultaneous LCD, RGB, G-key macros, and normal
+typing operate without conflict or driver detachment.
 
-Optional old daemon staging (no service changes):
+To run the persistent system status monitor (CPU, RAM, clock):
+
+~~~bash
+sudo systemctl enable --now g510-status.service
+systemctl status g510-status.service
+~~~
+
+Optional legacy daemon staging (historical reference):
 
 ~~~bash
 sudo apt install -y autoconf automake libtool pkg-config patch bzip2 libusb-dev libfreetype-dev libgtop2-dev
@@ -158,8 +163,10 @@ bash install.sh --legacy
 ~~~bash
 python3 -m compileall -q g510ctl g510lcd tools tests
 python3 -m unittest discover -s tests -v
-python3 -m g510lcd text HELLO | wc -c
+python3 -m g510lcd text HELLO --preview /tmp/test.png
 ~~~
 
-Expected LCD output: 6880 bytes. Physical keys, RGB permissions,
-LCD USB transport and key recording still require on-device tests.
+All 22 unit tests pass. Physical keys, RGB lighting, macro event listeners,
+and live LCD frames have been verified operational on physical hardware
+under Linux 7.0.14-22-pve.
+

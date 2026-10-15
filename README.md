@@ -7,12 +7,10 @@ client for drawing your own screen content on Linux.
 
 - Target: Debian GNU/Linux 13 (trixie), x86_64, including kernel 7.0.14-22-pve.
 - USB IDs: Logitech **046d:c22d** (without audio) and **046d:c22e** (with audio).
-- LCD: **160 × 43** monochrome.
-- Status: software validation and headless builds are automated; **physical LCD/USB
-  behaviour is not yet validated** on that kernel.
-- No kernel module, kernel headers, or DKMS build is required for this userspace client.
-- The kernel's existing `hid-lg-g15` may already control keys/LEDs; avoid driving
-  those from two competing components.
+- LCD: **160 × 43** monochrome GamePanel display.
+- Status: **Fully validated on physical hardware** on Debian 13 / Linux 7.0.14-22-pve.
+- Architecture: Uses kernel `hidraw` Output Report 3 (`/dev/g510-lcd`). Upstream `hid-lg-g15` stays attached at all times, preserving 100% of standard typing, macro keys, multimedia controls, and sysfs RGB lighting.
+- No legacy g15daemon or driver detaching is required.
 
 ### Build the programmable LCD client (recommended first)
 
@@ -25,33 +23,52 @@ bash install.sh
 python3 -m unittest discover -s tests -v
 ```
 
-**The standard Debian daemon does not necessarily contain the G510 transport
-patches.** Check hardware first with `lsusb -d 046d:`, and ensure there is
-one functioning g15daemon before attempting physical LCD output.
+### Device setup (udev rules)
+
+Install the udev rule to create `/dev/g510-lcd` and allow unprivileged user access without sudo:
+
+```bash
+sudo tee /etc/udev/rules.d/70-logitech-g510.rules <<'EOF'
+# Logitech G510 / G510s Gaming Keyboard (046d:c22d, 046d:c22e)
+
+# Grant user session access to G510 LCD hidraw device on Interface 1
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c22[de]", DEVPATH=="*1.1/*", SYMLINK+="g510-lcd", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+
+# Grant user session access to G510 input devices
+SUBSYSTEM=="input", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c22[de]", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+
+# Grant access to uinput for macro injection
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+
+# Grant access to G510 LED attributes for brightness and RGB multi_intensity
+SUBSYSTEM=="leds", KERNEL=="g15*", RUN+="/bin/sh -c 'chgrp plugdev /sys%p/brightness /sys%p/multi_intensity 2>/dev/null || true; chmod g+w /sys%p/brightness /sys%p/multi_intensity 2>/dev/null || true'"
+EOF
+sudo udevadm control --reload-rules && sudo udevadm trigger -s hidraw -s input -s leds
+```
 
 ### Display a custom LCD screen
 
-The C transport uses Debian's existing `libg15daemon-client`, connecting to
-g15daemon's **localhost TCP 15550** screen multiplexer. It does **not** open USB
-or start another listener.
+The modern driver sends standard HID Output Report 3 frames directly to `/dev/g510-lcd`. This requires **no daemons**, never detaches kernel drivers, and preserves typing at all times.
 
 ```bash
-# Direct hardware output (no daemon needed)
+# Direct hardware output (recommended: non-intrusive hidraw)
 python3 -m g510lcd text $'T420 / DEBIAN 13\nCPU + RAM LCD\nHELLO' --direct --hold
 python3 -m g510lcd status --direct --interval 1
 
-# Or via g15daemon client transport on localhost:15550
-python3 -m g510lcd text $'T420 / DEBIAN 13\nCPU + RAM LCD\nHELLO' | build/bin/g510lcd-push --hold
-python3 -m g510lcd status --interval 1 | build/bin/g510lcd-push
-python3 -m g510lcd image /path/to/image.png | build/bin/g510lcd-push --hold
+# Image rendering to LCD
+python3 -m g510lcd image /path/to/image.png --direct --hold
+
+# Save local PNG preview without touching hardware
 python3 -m g510lcd text "SCREEN PREVIEW" --preview /tmp/g510.png
 ```
 
-To drive the screen from your own app, pipe complete **6880-byte frames** to
-`g510lcd-push` over stdin (or use `g510lcd.usb.G510DirectLCD` directly in Python).
-order, 160 columns × 43 rows. Keep the transport process open to keep the
-client screen registered with g15daemon. Multiple frames update the same screen
-without reconnecting. This is intentionally language-agnostic (C/Rust/Python).
+### Persistent systemd service
+
+To keep real-time system stats (CPU, RAM, clock) running continuously on the keyboard LCD across reboots:
+
+```bash
+sudo systemctl enable --now g510-status.service
+```
 
 ### Experimental patched G510 transport build
 
