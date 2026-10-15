@@ -30,6 +30,9 @@ build_one() {
     if [[ -n "$patchname" ]]; then
       patch -p1 --batch --forward < "$root/$patchname"
     fi
+    if [[ "$name" == "libg15render" ]]; then
+      sed -i '1i#include <stdlib.h>\n#include <math.h>\n#include <unistd.h>' pixel.c
+    fi
     if [[ "$name" == "g15daemon" ]]; then
       python3 "$root/tools/harden-legacy-daemon.py" plugins/g15_plugin_uinput.c
     fi

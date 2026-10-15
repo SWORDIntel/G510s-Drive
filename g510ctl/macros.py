@@ -1,6 +1,6 @@
 """User-session macro engine for the Logitech G510/G510s.
 
-No HID detaching, no shell=True, no global keyboard capture, no root execution.
+No HID detaching, no shell invocation, no global keyboard capture or root execution.
 Normal media keys remain with KDE; G keys are explicitly configured here.
 Optional MR recording watches a second device ONLY during recording, for up to
 30 seconds, after --record-source was explicitly supplied.
