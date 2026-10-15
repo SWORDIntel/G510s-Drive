@@ -20,7 +20,7 @@ import time
 from typing import Any
 
 from .events import _evdev, gaming_device, normalized_key_event
-from .leds import set_indicator, set_profile
+from .leds import set_indicator, set_profile, set_rgb
 
 CONFIG = Path.home() / ".config/g510s-drive/config.json"
 MAX_CONFIG_SIZE = 262144
@@ -36,6 +36,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "M3": {},
     },
     "profile_rgb": {"M1": "#00dc00", "M2": "#dc0000", "M3": "#0000dc"},
+    "special_actions": {},
 }
 
 
@@ -100,6 +101,14 @@ def validate_config(config: Any) -> dict[str, Any]:
     if any(not isinstance(v, str) or re.fullmatch(r"#[0-9a-fA-F]{6}", v) is None
            for v in colors.values()):
         raise ValueError("profile_rgb values must be #RRGGBB")
+    actions = config.get("special_actions", {})
+    allowed = {f"L{i}" for i in range(1, 6)}
+    allowed.update({"HEADPHONE_MUTE", "MICROPHONE_MUTE", "VOLUME_UP",
+                    "VOLUME_DOWN", "PLAY_PAUSE", "STOP", "PREVIOUS", "NEXT"})
+    if not isinstance(actions, dict) or any(key not in allowed for key in actions):
+        raise ValueError("special_actions can bind L1-L5 or named media functions")
+    for action in actions.values():
+        validate_action(action)
     return config
 
 
@@ -164,6 +173,11 @@ class MacroEngine:
         self.pressed: set[str] = set()
         self.sink = None
         self.record_codes = set(record_codes or ())
+        for action in self.config.get("special_actions", {}).values():
+            if action["type"] == "keys":
+                self.record_codes.update(keycode(name) for name in action["keys"])
+            elif action["type"] == "recorded":
+                self.record_codes.update(keycode(event["code"]) for event in action["events"])
 
     def announce(self, msg: str) -> None:
         print(f"[g510ctl] {msg}", file=sys.stderr, flush=True)
@@ -180,6 +194,12 @@ class MacroEngine:
             set_profile(int(name[-1]))
         except (FileNotFoundError, PermissionError, OSError) as exc:
             self.announce(f"profile LED unavailable: {exc}")
+        color = self.config.get("profile_rgb", {}).get(name)
+        if color:
+            try:
+                set_rgb(color)
+            except (FileNotFoundError, PermissionError, OSError) as exc:
+                self.announce(f"{name} RGB unavailable: {exc}")
         self.announce(f"profile: {name}")
 
     def _uinput(self):
@@ -270,8 +290,14 @@ class MacroEngine:
                 except (OSError, ValueError) as exc:
                     self.announce(f"{self.profile}/{name} macro failed: {exc}")
             return
-        if name.startswith("L") and name[1:].isdigit():
-            self.announce(f"LCD menu {name} pressed; reserved for screen navigation")
+        action = self.config.get("special_actions", {}).get(name)
+        if action:
+            try:
+                self._execute(action)
+            except (OSError, ValueError) as exc:
+                self.announce(f"special {name} action failed: {exc}")
+        elif name.startswith("L") and name[1:].isdigit():
+            self.announce(f"LCD menu {name} pressed; not yet assigned to a custom screen")
 
     def on_capture(self, code: int, value: int, timestamp: float | None = None) -> None:
         if self.recording_key is None or value not in (0, 1):
