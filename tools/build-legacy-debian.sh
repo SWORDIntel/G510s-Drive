@@ -17,6 +17,7 @@ for cmd in tar patch make cc; do
   command -v "$cmd" >/dev/null || { echo "Missing $cmd" >&2; exit 2; }
 done
 export CPPFLAGS="-I$stage$prefix/include ${CPPFLAGS:-}"
+export CFLAGS="-I$stage$prefix/include ${CFLAGS:-}"
 export LDFLAGS="-L$stage$prefix/lib -Wl,-rpath,$prefix/lib ${LDFLAGS:-}"
 export LD_LIBRARY_PATH="$stage$prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export PKG_CONFIG_PATH="$stage$prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
