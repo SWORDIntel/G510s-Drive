@@ -108,6 +108,7 @@ doing so can interrupt normal keyboard input.
 
 See [full keyboard controls](docs/KEYBOARD-CONTROLS.md) for RGB lighting, profile
 LEDs, G1-G18, M1-M3, MR recording, LCD buttons, and native media key behaviour.
+Check the [Project Roadmap](ROADMAP.md) for planned capabilities including multi-page LCD applets, security ticker, and reactive RGB event alerts.
 
 ## Tests and security
 
