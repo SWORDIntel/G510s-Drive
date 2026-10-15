@@ -86,6 +86,33 @@ def _is_gaming(device, evdev) -> bool:
     )
 
 
+
+def media_devices(exclude_paths: set[str] | None = None):
+    """Return G510 non-gaming evdev nodes carrying media key events, no grabs."""
+    import os
+    evdev = _evdev()
+    exclude = {os.path.realpath(p) for p in (exclude_paths or set())}
+    wanted = {getattr(evdev.ecodes, key) for key in (
+        "KEY_MUTE", "KEY_F20", "KEY_VOLUMEUP", "KEY_VOLUMEDOWN",
+        "KEY_PLAYPAUSE", "KEY_PREVIOUSSONG", "KEY_NEXTSONG", "KEY_STOPCD"
+    ) if hasattr(evdev.ecodes, key)}
+    devices = []
+    for path in evdev.list_devices():
+        if os.path.realpath(path) in exclude:
+            continue
+        try:
+            device = evdev.InputDevice(path)
+        except OSError:
+            continue
+        caps = set(device.capabilities().get(evdev.ecodes.EV_KEY, []))
+        if (device.info.vendor == USB_VENDOR
+                and device.info.product in USB_PRODUCTS and caps & wanted):
+            devices.append(device)
+        else:
+            device.close()
+    return devices
+
+
 def probe() -> list[dict[str, object]]:
     evdev = _evdev()
     result = []
