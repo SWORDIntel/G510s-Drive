@@ -23,7 +23,7 @@ A modern Linux hardware control suite for the Logitech G510 and G510s Gaming Key
 - [x] **Security & Lab Ticker**: Failed SSH attempts in last hour, active QEMU/KVM VMs, and Docker container count.
 - [x] **AI Agent Activity Indicator**: Real-time status display for workbench coding assistants (`STATE`, `TASK`, `ROLE`).
 - [x] **MPRIS Media Player Applet**: Currently playing track, artist name, and playback status via `playerctl`.
-- [ ] **Crypto & Node Sync Applet**: Local node block height, sync percentage, and network stats (e.g., Monero daemon).
+- [x] ~~**Crypto & Node Sync Applet**~~: *Superseded by Extensible IPC Plugin Engine (User directive: out-of-scope in favor of developer plugin API).*
 - [x] **Notification Toast Engine**: Pop-up overlay box on the LCD for desktop notifications and CLI triggers (`g510ctl toast`).
 
 ---
@@ -55,3 +55,27 @@ A modern Linux hardware control suite for the Logitech G510 and G510s Gaming Key
   - LCD toast feedback (`MICROPHONE [MUTED]` / `[ACTIVE]`) and reactive amber alert flashes.
 - [x] **Hardware Game-Mode Switch & Profile Security**:
   - Hardware electrical interlock for Windows/Super keys preserved on Interface 0.
+
+---
+
+## Phase 5: Extensible IPC Plugin Engine & Developer API
+- [x] **Unix Domain Socket Engine (`/run/user/<uid>/g510d.sock`)**:
+  - High-performance, non-blocking stream server embedded directly in native `g510d`.
+  - Secure permissions (`0600`) restricted to active seat session.
+  - JSON-Lines line-delimited request/response protocol with sub-millisecond round-trip latency.
+- [x] **Dynamic Multi-Page LCD Carousel**:
+  - External plugins register custom pages (`register_page`) with custom titles, 3 content rows, and progress/gauge bars (`0.0..100.0%`).
+  - Seamless integration into physical hardware buttons L1 (Prev), L2 (Next), and L5 (Home).
+  - Dynamic page scaling (carousel header updates automatically `[X/N:TITLE]`).
+  - Clean unregistration (`unregister_page`) on plugin exit without leaving orphaned slots.
+- [x] **IPC Event & Alert Routing**:
+  - Modal toast overlay dispatching (`toast`) from any background process or CLI script.
+  - Reactive RGB hardware alerts (`alert`) with flash/pulse animations and baseline restoration.
+  - Carousel page switching (`set_page`) and daemon status queries (`get_status`, `list_pages`).
+- [x] **CLI Tooling (`g510ctl plugin`)**:
+  - Full CLI management commands: `ping`, `register`, `update`, `unregister`, `list`.
+  - Automatic fallback between live IPC socket and local state files.
+- [x] **Developer Documentation & Reference Plugins**:
+  - Complete API specification and LCD layout guide in `docs/PLUGINS.md`.
+  - Reference Python disk monitoring daemon in `examples/plugins/disk_monitor.py`.
+  - Reference Shell/Bash live clock & uptime ticker in `examples/plugins/clock_ticker.sh`.

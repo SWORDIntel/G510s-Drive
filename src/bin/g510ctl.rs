@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand};
 use g510::{
     events::{find_gaming_device, key_from_code},
     framebuffer::G510Framebuffer,
+    ipc::{send_ipc_request, IpcRequest},
     leds::{set_profile, set_rgb, snapshot},
     macros::{default_config_path, load_config, save_config, MacroConfig, MacroEngine},
     render::render_text_screen,
@@ -23,7 +24,7 @@ struct Cli {
 enum Commands {
     /// Probe Logitech G510 USB and evdev devices
     Probe,
-    /// Display current LED and hardware status
+    /// Display current LED, daemon, and hardware status
     Status,
     /// Set RGB backlighting color
     Rgb {
@@ -70,15 +71,18 @@ enum Commands {
         #[arg(long)]
         config: Option<PathBuf>,
     },
-    /// Switch active LCD carousel page (1=SYS, 2=NET, 3=SEC, 4=MEDIA, 5=AGENT)
+    /// Switch active LCD carousel page (1=SYS, 2=NET, 3=SEC, 4=MEDIA, 5=AGENT, 6+=Dynamic)
     Page {
-        /// Page number (1-5)
+        /// Page number (1-based index)
         number: usize,
     },
     /// Display a pop-up toast notification overlay on the LCD
     Toast {
         /// Message to display (up to 3 lines)
         message: String,
+        /// Duration in milliseconds (default: 2500)
+        #[arg(long)]
+        duration_ms: Option<u64>,
     },
     /// Trigger reactive RGB lighting alert (flash or pulse)
     Alert {
@@ -103,6 +107,64 @@ enum Commands {
         #[arg(long)]
         toggle: bool,
     },
+    /// Manage dynamic LCD applet plugins over IPC
+    Plugin {
+        #[command(subcommand)]
+        action: PluginAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum PluginAction {
+    /// Register a new dynamic page in the LCD carousel
+    Register {
+        /// Unique plugin page ID (e.g. disk, weather, docker)
+        id: String,
+        /// Screen title shown in header [X/Y:TITLE] (default: upper ID)
+        #[arg(long)]
+        title: Option<String>,
+        /// Content line 1 (up to 26 chars)
+        #[arg(long, default_value = "")]
+        line1: String,
+        /// Content line 2 (up to 26 chars)
+        #[arg(long, default_value = "")]
+        line2: String,
+        /// Content line 3 (up to 26 chars)
+        #[arg(long, default_value = "")]
+        line3: String,
+        /// Progress / Gauge percentage (0.0 to 100.0)
+        #[arg(long)]
+        bar: Option<f32>,
+    },
+    /// Update an existing dynamic page
+    Update {
+        /// Unique plugin page ID
+        id: String,
+        /// New screen title
+        #[arg(long)]
+        title: Option<String>,
+        /// New line 1
+        #[arg(long)]
+        line1: Option<String>,
+        /// New line 2
+        #[arg(long)]
+        line2: Option<String>,
+        /// New line 3
+        #[arg(long)]
+        line3: Option<String>,
+        /// New progress / Gauge percentage (0.0 to 100.0)
+        #[arg(long)]
+        bar: Option<f32>,
+    },
+    /// Unregister a dynamic page and remove it from the carousel
+    Unregister {
+        /// Unique plugin page ID
+        id: String,
+    },
+    /// List all currently registered dynamic pages
+    List,
+    /// Ping the IPC daemon
+    Ping,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -127,7 +189,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Status => {
             let snap = snapshot(None);
-            println!("{}", serde_json::to_string_pretty(&snap)?);
+            let ipc_info = match send_ipc_request(&IpcRequest::GetStatus) {
+                Ok(resp) if resp.ok => resp.data,
+                _ => None,
+            };
+
+            let out = serde_json::json!({
+                "hardware": snap,
+                "daemon_ipc": ipc_info.unwrap_or_else(|| serde_json::json!({"status": "offline"})),
+            });
+            println!("{}", serde_json::to_string_pretty(&out)?);
         }
         Commands::Rgb {
             color,
@@ -225,16 +296,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Commands::Page { number } => {
-            if (1..=5).contains(&number) {
-                std::fs::write("/tmp/g510-page", number.to_string())?;
-                println!("Requested carousel switch to page {number}");
-            } else {
-                eprintln!("Invalid page number {number}: must be 1..5 (1=SYS, 2=NET, 3=SEC, 4=MEDIA, 5=AGENT)");
+            let req = IpcRequest::SetPage { number };
+            match send_ipc_request(&req) {
+                Ok(resp) if resp.ok => {
+                    println!("Requested carousel switch to page {number} via g510d IPC");
+                }
+                _ => {
+                    std::fs::write("/tmp/g510-page", number.to_string())?;
+                    println!("Requested carousel switch to page {number} (fallback)");
+                }
             }
         }
-        Commands::Toast { message } => {
-            std::fs::write("/tmp/g510-toast", message)?;
-            println!("Toast notification queued for G510 LCD");
+        Commands::Toast { message, duration_ms } => {
+            let dur = duration_ms.unwrap_or(2500);
+            let req = IpcRequest::Toast {
+                message: message.clone(),
+                duration_ms: dur,
+            };
+            match send_ipc_request(&req) {
+                Ok(resp) if resp.ok => {
+                    println!("Toast notification displayed via g510d IPC (duration: {dur}ms)");
+                }
+                _ => {
+                    std::fs::write("/tmp/g510-toast", message)?;
+                    println!("Toast notification queued for G510 LCD (fallback)");
+                }
+            }
         }
         Commands::Alert {
             mode,
@@ -242,13 +329,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             times,
             duration,
         } => {
-            let alert_payload = if mode == "pulse" {
-                format!("{{\"type\": \"pulse\", \"color\": \"{color}\", \"duration\": {duration}}}")
-            } else {
-                format!("{{\"type\": \"flash\", \"color\": \"{color}\", \"times\": {times}}}")
+            let req = IpcRequest::Alert {
+                mode: mode.clone(),
+                color: color.clone(),
+                times,
+                duration,
             };
-            std::fs::write("/tmp/g510-alert", alert_payload)?;
-            println!("Alert {mode} ({color}) queued for G510 keyboard");
+            match send_ipc_request(&req) {
+                Ok(resp) if resp.ok => {
+                    println!("Alert {mode} ({color}) dispatched via g510d IPC");
+                }
+                _ => {
+                    let alert_payload = if mode == "pulse" {
+                        format!("{{\"type\": \"pulse\", \"color\": \"{color}\", \"duration\": {duration}}}")
+                    } else {
+                        format!("{{\"type\": \"flash\", \"color\": \"{color}\", \"times\": {times}}}")
+                    };
+                    std::fs::write("/tmp/g510-alert", alert_payload)?;
+                    println!("Alert {mode} ({color}) queued for G510 keyboard (fallback)");
+                }
+            }
         }
         Commands::Mute { target, toggle } => {
             match target.to_lowercase().as_str() {
@@ -281,6 +381,102 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 other => eprintln!("Unknown mute target '{other}': use 'mic' or 'audio'"),
             }
         }
+        Commands::Plugin { action } => match action {
+            PluginAction::Ping => {
+                let start = std::time::Instant::now();
+                match send_ipc_request(&IpcRequest::Ping) {
+                    Ok(resp) if resp.ok => {
+                        let elapsed = start.elapsed();
+                        println!("g510d IPC: PONG ({:?})", elapsed);
+                    }
+                    Ok(resp) => {
+                        eprintln!("g510d IPC error: {}", resp.error.unwrap_or_else(|| "unknown".into()));
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to connect to g510d IPC socket: {e}");
+                        eprintln!("Check if g510d daemon is running (`systemctl status g510-status`)");
+                    }
+                }
+            }
+            PluginAction::Register {
+                id,
+                title,
+                line1,
+                line2,
+                line3,
+                bar,
+            } => {
+                let t = title.unwrap_or_else(|| id.to_uppercase());
+                let req = IpcRequest::RegisterPage {
+                    id: id.clone(),
+                    title: t,
+                    line1,
+                    line2,
+                    line3,
+                    bar,
+                };
+                match send_ipc_request(&req) {
+                    Ok(resp) if resp.ok => {
+                        println!("Registered dynamic page '{id}' in LCD carousel");
+                    }
+                    Ok(resp) => {
+                        eprintln!("Error registering page: {}", resp.error.unwrap_or_default());
+                    }
+                    Err(e) => eprintln!("IPC connection error: {e}"),
+                }
+            }
+            PluginAction::Update {
+                id,
+                title,
+                line1,
+                line2,
+                line3,
+                bar,
+            } => {
+                let req = IpcRequest::UpdatePage {
+                    id: id.clone(),
+                    title,
+                    line1,
+                    line2,
+                    line3,
+                    bar,
+                };
+                match send_ipc_request(&req) {
+                    Ok(resp) if resp.ok => {
+                        println!("Updated dynamic page '{id}'");
+                    }
+                    Ok(resp) => {
+                        eprintln!("Error updating page: {}", resp.error.unwrap_or_default());
+                    }
+                    Err(e) => eprintln!("IPC connection error: {e}"),
+                }
+            }
+            PluginAction::Unregister { id } => {
+                let req = IpcRequest::UnregisterPage { id: id.clone() };
+                match send_ipc_request(&req) {
+                    Ok(resp) if resp.ok => {
+                        println!("Unregistered dynamic page '{id}'");
+                    }
+                    Ok(resp) => {
+                        eprintln!("Error unregistering page: {}", resp.error.unwrap_or_default());
+                    }
+                    Err(e) => eprintln!("IPC connection error: {e}"),
+                }
+            }
+            PluginAction::List => {
+                match send_ipc_request(&IpcRequest::ListPages) {
+                    Ok(resp) if resp.ok => {
+                        if let Some(val) = resp.data {
+                            println!("{}", serde_json::to_string_pretty(&val)?);
+                        } else {
+                            println!("[]");
+                        }
+                    }
+                    Ok(resp) => eprintln!("Error: {}", resp.error.unwrap_or_default()),
+                    Err(e) => eprintln!("IPC connection error: {e}"),
+                }
+            }
+        },
     }
 
     Ok(())
