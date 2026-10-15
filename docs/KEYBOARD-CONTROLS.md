@@ -128,6 +128,11 @@ buttons may use a separate HID audio interface.
 For the programmable LCD use:
 
 ~~~bash
+# Direct hardware output (no background daemon needed)
+python3 -m g510lcd text "MY SCREEN" --direct --hold
+python3 -m g510lcd status --direct --interval 1
+
+# Or via g15daemon client transport on localhost:15550
 python3 -m g510lcd text "MY SCREEN" --preview /tmp/g510.png
 python3 -m g510lcd text "MY SCREEN" | build/bin/g510lcd-push --hold
 python3 -m g510lcd status --interval 1 | build/bin/g510lcd-push

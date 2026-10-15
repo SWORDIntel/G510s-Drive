@@ -36,6 +36,11 @@ g15daemon's **localhost TCP 15550** screen multiplexer. It does **not** open USB
 or start another listener.
 
 ```bash
+# Direct hardware output (no daemon needed)
+python3 -m g510lcd text $'T420 / DEBIAN 13\nCPU + RAM LCD\nHELLO' --direct --hold
+python3 -m g510lcd status --direct --interval 1
+
+# Or via g15daemon client transport on localhost:15550
 python3 -m g510lcd text $'T420 / DEBIAN 13\nCPU + RAM LCD\nHELLO' | build/bin/g510lcd-push --hold
 python3 -m g510lcd status --interval 1 | build/bin/g510lcd-push
 python3 -m g510lcd image /path/to/image.png | build/bin/g510lcd-push --hold
@@ -43,7 +48,7 @@ python3 -m g510lcd text "SCREEN PREVIEW" --preview /tmp/g510.png
 ```
 
 To drive the screen from your own app, pipe complete **6880-byte frames** to
-`g510lcd-push` over stdin: one uint8 (0=off, 1=on) per pixel in row-major
+`g510lcd-push` over stdin (or use `g510lcd.usb.G510DirectLCD` directly in Python).
 order, 160 columns × 43 rows. Keep the transport process open to keep the
 client screen registered with g15daemon. Multiple frames update the same screen
 without reconnecting. This is intentionally language-agnostic (C/Rust/Python).

@@ -113,12 +113,15 @@ def frame_bytes(image: Image.Image, invert: bool = False) -> bytes:
     return bytes(1 if (p < 128 if invert else p >= 128) else 0 for p in pixels)
 
 
-def emit(image: Image.Image, invert: bool, preview: str | None) -> None:
+def emit(image: Image.Image, invert: bool, preview: str | None, direct_lcd=None) -> None:
     if preview:
         result = Image.frombytes("L", (WIDTH, HEIGHT),
                                  bytes(255 * p for p in frame_bytes(image, invert)))
         result.resize((WIDTH * 4, HEIGHT * 4),
                       Image.Resampling.NEAREST).save(preview)
+        return
+    if direct_lcd is not None:
+        direct_lcd.write(image, invert=invert)
         return
     sys.stdout.buffer.write(frame_bytes(image, invert))
     sys.stdout.buffer.flush()
@@ -136,12 +139,33 @@ def main(argv: list[str] | None = None) -> int:
     for cmd in (text_cmd, image_cmd, stats_cmd):
         cmd.add_argument("--preview", metavar="PNG", help="save PNG instead of sending bytes")
         cmd.add_argument("--invert", action="store_true")
+        cmd.add_argument("--direct", action="store_true", help="write directly to G510 USB device without daemon")
+        cmd.add_argument("--hold", action="store_true", help="keep displaying image/text until interrupted")
     args = parser.parse_args(argv)
+    
+    direct_lcd = None
+    if getattr(args, "direct", False):
+        from .usb import G510DirectLCD
+        direct_lcd = G510DirectLCD()
+        direct_lcd.open()
+
     try:
         if args.command == "text":
-            emit(text_screen(args.message), args.invert, args.preview)
+            img = text_screen(args.message)
+            emit(img, args.invert, args.preview, direct_lcd)
+            if getattr(args, "hold", False) and not args.preview:
+                while True:
+                    time.sleep(1)
+                    if direct_lcd is not None:
+                        direct_lcd.write(img, invert=args.invert)
         elif args.command == "image":
-            emit(image_screen(args.path), args.invert, args.preview)
+            img = image_screen(args.path)
+            emit(img, args.invert, args.preview, direct_lcd)
+            if getattr(args, "hold", False) and not args.preview:
+                while True:
+                    time.sleep(1)
+                    if direct_lcd is not None:
+                        direct_lcd.write(img, invert=args.invert)
         else:
             if not 0.2 <= args.interval <= 3600:
                 parser.error("interval must be in [0.2, 3600] seconds")
@@ -151,7 +175,7 @@ def main(argv: list[str] | None = None) -> int:
                 current = cpu_counters()
                 screen = status_screen(cpu_percentage(previous, current),
                                        memory_percentage(), datetime.now().strftime("%H:%M"))
-                emit(screen, args.invert, args.preview)
+                emit(screen, args.invert, args.preview, direct_lcd)
                 previous = current
                 if args.preview:
                     break
@@ -162,4 +186,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except KeyboardInterrupt:
         return 0
+    finally:
+        if direct_lcd is not None:
+            direct_lcd.close()
     return 0
