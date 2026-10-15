@@ -18,8 +18,8 @@ client for drawing your own screen content on Linux.
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential libg15daemon-client-dev python3 python3-pil
-git clone https://github.com/SWORDIntel/G510s-Drive.git
+sudo apt install -y build-essential libg15daemon-client-dev python3 python3-pil python3-evdev
+git clone -b modernize/debian13-g510-lcd https://github.com/SWORDIntel/G510s-Drive.git
 cd G510s-Drive
 bash install.sh
 python3 -m unittest discover -s tests -v
@@ -64,8 +64,8 @@ set USB permissions, or execute any historical macro scripts.**
 
 Do **not** run the old Arch `PKGBUILD` scripts on Debian. The original Arch
 package had root-privileged script execution, a hard-coded user ID, and a
-world-writable macro directory. G-key shell macro invocation has been disabled
-in the modernized G510 patch: use kernel input remapping or a controlled
+world-writable macro directory. The experimental Debian legacy build applies an extra hardening step to remove
+shell macro invocation and emit Linux input events instead: use kernel input remapping or a controlled
 user-session shortcut service instead. Until the legacy stack is validated on
 actual hardware, keep an existing working keyboard configuration unchanged.
 
@@ -81,6 +81,11 @@ ss -ltnp | grep ':15550'
 If a G510 daemon cannot acquire the USB interfaces, inspect `dmesg` and
 `lsusb -t`; don't blindly unload `usbhid` or `hid-lg-g15`, because
 doing so can interrupt normal keyboard input.
+
+## Keyboard RGB, macro keys and special functions
+
+See [full keyboard controls](docs/KEYBOARD-CONTROLS.md) for RGB lighting, profile
+LEDs, G1-G18, M1-M3, MR recording, LCD buttons, and native media key behaviour.
 
 ## Tests and security
 

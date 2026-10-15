@@ -30,6 +30,9 @@ build_one() {
     if [[ -n "$patchname" ]]; then
       patch -p1 --batch --forward < "$root/$patchname"
     fi
+    if [[ "$name" == "g15daemon" ]]; then
+      python3 "$root/tools/harden-legacy-daemon.py" plugins/g15_plugin_uinput.c
+    fi
     ./configure --prefix="$prefix" --libdir="$prefix/lib" --sbindir="$prefix/sbin" --disable-static
     make -j "$jobs"
     make DESTDIR="$stage" install
