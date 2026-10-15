@@ -1,10 +1,6 @@
-#!/bin/bash
-
-# Exit on error
-set -e
-
-# Install packages in the correct order
-(cd libg15 && makepkg -si $@)
-(cd libg15render && makepkg -si $@)
-(cd g15daemon && makepkg -si $@)
-(cd g15stats && makepkg -si $@)
+#!/usr/bin/env bash
+# Safe Debian entry point. Historical Arch Linux makepkg script retired.
+# Builds locally only; does not install packages or execute sudo.
+set -Eeuo pipefail
+root="$(cd -- "$(dirname -- "$0")" && pwd)"
+exec bash "$root/tools/build-debian.sh" "$@"

@@ -1,4 +1,5 @@
-# ignore sources and built packages
-src
-pkg
-*.pkg.tar
+build/
+__pycache__/
+*.pyc
+*.o
+*.log
