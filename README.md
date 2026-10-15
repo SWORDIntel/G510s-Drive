@@ -12,14 +12,19 @@ client for drawing your own screen content on Linux.
 - Architecture: Uses kernel `hidraw` Output Report 3 (`/dev/g510-lcd`). Upstream `hid-lg-g15` stays attached at all times, preserving 100% of standard typing, macro keys, multimedia controls, and sysfs RGB lighting.
 - No legacy g15daemon or driver detaching is required.
 
-### Build the programmable LCD client (recommended first)
+### Build Native Rust Suite (Recommended: <2MB RAM, instant response)
+
+```bash
+cargo build --release
+sudo cp target/release/g510ctl target/release/g510d /usr/local/bin/
+cargo test
+```
+
+### Python / Legacy client build
 
 ```bash
 sudo apt update
 sudo apt install -y build-essential libg15daemon-client-dev python3 python3-pil python3-evdev
-git clone -b modernize/debian13-g510-lcd https://github.com/SWORDIntel/G510s-Drive.git
-cd G510s-Drive
-bash install.sh
 python3 -m unittest discover -s tests -v
 ```
 
@@ -48,23 +53,27 @@ sudo udevadm control --reload-rules && sudo udevadm trigger -s hidraw -s input -
 
 ### Display a custom LCD screen
 
-The modern driver sends standard HID Output Report 3 frames directly to `/dev/g510-lcd`. This requires **no daemons**, never detaches kernel drivers, and preserves typing at all times.
+The modern driver sends standard HID Output Report 3 frames directly to `/dev/g510-lcd`. This requires **no legacy daemons**, never detaches kernel drivers, and preserves typing at all times.
 
 ```bash
-# Direct hardware output (recommended: non-intrusive hidraw)
+# High-speed native Rust CLI (installed to /usr/local/bin)
+g510ctl probe
+g510ctl status
+g510ctl rgb '#00dc00' --brightness 255
+g510ctl profile 1
+g510ctl text $'T420 / DEBIAN 13\nHELLO FROM RUST' --hold
+
+# Background daemon with live CPU/RAM/clock and gaming key listener
+g510d --interval 1.0
+
+# Direct Python hardware output
 python3 -m g510lcd text $'T420 / DEBIAN 13\nCPU + RAM LCD\nHELLO' --direct --hold
 python3 -m g510lcd status --direct --interval 1
-
-# Image rendering to LCD
-python3 -m g510lcd image /path/to/image.png --direct --hold
-
-# Save local PNG preview without touching hardware
-python3 -m g510lcd text "SCREEN PREVIEW" --preview /tmp/g510.png
 ```
 
 ### Persistent systemd service
 
-To keep real-time system stats (CPU, RAM, clock) running continuously on the keyboard LCD across reboots:
+To keep the native Rust daemon running continuously on the keyboard across reboots:
 
 ```bash
 sudo systemctl enable --now g510-status.service

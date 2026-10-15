@@ -1,0 +1,29 @@
+[package]
+name = "g510s-drive"
+version = "0.2.0"
+edition = "2021"
+description = "High-performance Linux driver, daemon and CLI for Logitech G510 / G510s Gaming Keyboards"
+license = "GPL-2.0-or-later"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+embedded-graphics = "0.8"
+evdev = "0.13"
+libc = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "g510ctl"
+path = "src/bin/g510ctl.rs"
+
+[[bin]]
+name = "g510d"
+path = "src/bin/g510d.rs"
+
+[lib]
+name = "g510"
+path = "src/lib.rs"
