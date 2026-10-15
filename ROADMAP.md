@@ -12,6 +12,7 @@ A modern Linux hardware control suite for the Logitech G510 and G510s Gaming Key
 - [x] Deploy persistent background system status monitor (`g510-status.service`).
 - [x] Verify sysfs RGB backlighting (`g15::kbd_backlight`) and M1–M3 profile indicator LEDs.
 - [x] Validate automated headless and packet-packing test suite (22/22 unit tests passing).
+- [x] Migrate driver transport, daemon, and CLI to native Rust (`g510d`, `g510ctl`), slashing daemon RSS from 11MB to 1.1MB with zero-allocation HID frame packing and 12/12 Rust unit tests.
 
 ---
 
