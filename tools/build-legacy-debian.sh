@@ -40,6 +40,9 @@ build_one() {
     ./configure --prefix="$prefix" --libdir="$prefix/lib" --sbindir="$prefix/sbin" --disable-static
     make -j "$jobs"
     make DESTDIR="$stage" install
+    # Libtool archives embed /opt/g510s absolute paths and break DESTDIR linking.
+    # Use staged shared .so files instead; no host installation occurs.
+    find "$stage$prefix/lib" -maxdepth 1 -type f -name "*.la" -delete
   )
 }
 build_one libg15 libg15/libg15-1.2.7.tar.bz2 libg15/libg15.patch
