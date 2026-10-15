@@ -19,7 +19,7 @@ import tempfile
 import time
 from typing import Any
 
-from .events import _evdev, gaming_device, normalized_key_event
+from .events import _evdev, gaming_device, normalized_key_event, media_devices
 from .leds import set_indicator, set_profile, set_rgb
 
 CONFIG = Path.home() / ".config/g510s-drive/config.json"
@@ -347,34 +347,57 @@ class MacroEngine:
 
 
 def run(config_path: Path = CONFIG, device_path: str | None = None,
-        record_source: str | None = None) -> None:
+        record_source: str | None = None, watch_media: bool = False) -> None:
+    """Watch only G510 special controls; opt-in recording opens only when active.
+
+    The normal typing keyboard input fd is NOT kept open in the background:
+    it is created on MR -> G-key and closed on MR stop/cancel.
+    """
     if os.geteuid() == 0:
         raise PermissionError("macro runner must NOT execute as root; fix event-node ACLs instead")
     evdev = _evdev()
     config = load_config(config_path)
     gaming = gaming_device(device_path)
     recorder = None
+    media = []
     codes: set[int] = set()
     try:
         if record_source:
-            recorder = evdev.InputDevice(record_source)
-            if not _is_safe_record_source(recorder, evdev, gaming.path):
-                raise ValueError("--record-source must be a separate physical typing keyboard")
-            codes = set(recorder.capabilities().get(evdev.ecodes.EV_KEY, []))
-        engine = MacroEngine(config, config_path, bool(recorder), codes)
+            check = evdev.InputDevice(record_source)
+            try:
+                if not _is_safe_record_source(check, evdev, gaming.path):
+                    raise ValueError("--record-source must be a separate physical typing keyboard")
+                codes = set(check.capabilities().get(evdev.ecodes.EV_KEY, []))
+            finally:
+                check.close()
+        if watch_media:
+            media = media_devices(exclude_paths={gaming.path})
+        engine = MacroEngine(config, config_path, bool(record_source), codes)
         engine._activate("M1")
         engine.announce(f"listening on {gaming.path} (no EVIOCGRAB)")
-        if recorder:
-            engine.announce(f"MR capture configured: {recorder.path}, only active after MR + G-key")
-        sources = [gaming] + ([recorder] if recorder else [])
+        if media:
+            engine.announce("media input events: " + ", ".join(device.path for device in media))
+        if record_source:
+            engine.announce("MR recording opt-in configured (typing device stays closed until armed)")
         try:
             while True:
+                if engine.recording_key and recorder is None and record_source:
+                    recorder = evdev.InputDevice(record_source)
+                    if not _is_safe_record_source(recorder, evdev, gaming.path):
+                        recorder.close()
+                        recorder = None
+                        raise ValueError("typing input source changed; refusing recording")
+                elif not engine.recording_key and recorder is not None:
+                    recorder.close()
+                    recorder = None
+                sources = [gaming] + media + ([recorder] if recorder else [])
                 ready, _, _ = select.select(sources, [], [], 0.25)
-                if engine.recording_key and time.monotonic() - engine.record_started >= MAX_RECORD_SECONDS:
+                if (engine.recording_key is not None
+                        and time.monotonic() - engine.record_started >= MAX_RECORD_SECONDS):
                     engine._end_recording(save=True)
                 for device in ready:
                     for event in device.read():
-                        if device is gaming:
+                        if device is gaming or device in media:
                             normalized = normalized_key_event(event)
                             if normalized:
                                 engine.on_special(normalized.name, normalized.pressed)
@@ -386,5 +409,7 @@ def run(config_path: Path = CONFIG, device_path: str | None = None,
             engine.close()
     finally:
         gaming.close()
-        if recorder:
+        if recorder is not None:
             recorder.close()
+        for device in media:
+            device.close()
