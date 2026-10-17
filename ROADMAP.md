@@ -136,3 +136,12 @@ A modern Linux hardware control deck and driver for the Logitech G510 and G510s 
 - [x] **Consumer-Friendly Documentation**: Rewrote `README.md` to remove AI buzzwords, featuring ASCII terminal mockups, 30-second install guide, physical button cheat sheets, and FAQ.
 - [x] **GitHub Release v0.2.0 Assets**: Uploaded `g510-deck_0.2.0_amd64.deb` and SHA256 checksums to GitHub Release `v0.2.0`.
 
+---
+
+## Phase 9: AI Agent Ecosystem & Hax Multi-Agent Cockpit
+- [x] **Multi-Tier Agent Telemetry (`hax_cockpit.py`)**: Real-time tracking of parent orchestrator (`vidoc-1`), child subagents (`agy`), and active process counts via zero-fork `/proc` scanning.
+- [x] **Round-Robin Account Pool & Rotation**: Monitored Google/Agy credential pool (`~/.config/hax/agy-accounts/`), distinguishing between orchestrator tokens, subagent execution, and 429 account failover.
+- [x] **LCD Dynamic Carousel Applet**: 160×43 GamePanel screen showing orchestrator/subagent status, context tokens (`Ctx: XXk`), and model context window fill gauge bar.
+- [x] **Smart Hardware Alerts**: Targeted amber pulses for round-robin 429 rotation, magenta flashes for filter rephrasing, and green flashes for task completion.
+- [x] **Dynamic Profile Color Restoration**: Updated `g510d` alert engine to resolve the live sysfs profile indicator LED (`macro_preset1-3`) ensuring RGB alerts always restore the active profile color (Red on M2).
+

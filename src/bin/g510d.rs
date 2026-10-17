@@ -54,6 +54,34 @@ fn install_signal_handlers() {
 
 const PAGE_NAMES: [&str; TOTAL_BUILTIN_PAGES] = ["SYSTEM", "NETWORK", "SECURITY", "MPRIS", "AGENT"];
 
+fn resolve_restore_color(engine: &Arc<Mutex<MacroEngine>>) -> String {
+    let snaps = g510::leds::snapshot(None);
+    if let Ok(eng) = engine.lock() {
+        let prof = if snaps.m2.unwrap_or(false) {
+            "M2"
+        } else if snaps.m3.unwrap_or(false) {
+            "M3"
+        } else if snaps.m1.unwrap_or(false) {
+            "M1"
+        } else {
+            &eng.active_profile
+        };
+        eng.config.profile_rgb.get(prof).cloned().unwrap_or_else(|| {
+            match prof {
+                "M2" => "#dc0000".into(),
+                "M3" => "#0000dc".into(),
+                _ => "#00dc00".into(),
+            }
+        })
+    } else if snaps.m2.unwrap_or(false) {
+        "#dc0000".into()
+    } else if snaps.m3.unwrap_or(false) {
+        "#0000dc".into()
+    } else {
+        "#00dc00".into()
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     install_signal_handlers();
@@ -234,11 +262,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             *t = Some((msg.to_string(), Instant::now(), Duration::from_millis(1500)));
                                         }
                                         if state == Some(true) {
-                                            let restore = if let Ok(eng) = engine_keys.lock() {
-                                                eng.config.profile_rgb.get(&eng.active_profile).cloned().unwrap_or_else(|| "#00dc00".into())
-                                            } else {
-                                                "#00dc00".into()
-                                            };
+                                            let restore = resolve_restore_color(&engine_keys);
                                             thread::spawn(move || {
                                                 g510::alerts::run_flash_alert("#ff8800", 2, &restore);
                                             });
@@ -328,11 +352,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if let Ok(mut pa) = ipc_state.pending_alert.lock() {
             if let Some(alert) = pa.take() {
-                let restore = if let Ok(eng) = engine.lock() {
-                    eng.config.profile_rgb.get(&eng.active_profile).cloned().unwrap_or_else(|| "#00dc00".into())
-                } else {
-                    "#00dc00".into()
-                };
+                let restore = resolve_restore_color(&engine);
                 thread::spawn(move || match alert {
                     g510::alerts::RgbAlert::Flash { color, times } => {
                         g510::alerts::run_flash_alert(&color, times, &restore);
@@ -371,11 +391,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Ok(content) = fs::read_to_string(&alert_file) {
                 let _ = fs::remove_file(&alert_file);
                 if let Ok(alert) = serde_json::from_str::<g510::alerts::RgbAlert>(&content) {
-                    let restore = if let Ok(eng) = engine.lock() {
-                        eng.config.profile_rgb.get(&eng.active_profile).cloned().unwrap_or_else(|| "#00dc00".into())
-                    } else {
-                        "#00dc00".into()
-                    };
+                    let restore = resolve_restore_color(&engine);
                     thread::spawn(move || {
                         match alert {
                             g510::alerts::RgbAlert::Flash { color, times } => {

@@ -453,3 +453,23 @@ Enable and start with:
 systemctl --user daemon-reload
 systemctl --user enable --now g510-disk-plugin.service
 ```
+
+---
+
+## 9. Hax Multi-Agent & Quota Cockpit (`hax_cockpit.py`)
+
+A production plugin located at `examples/plugins/hax_cockpit.py` that monitors autonomous AI agent workflows:
+
+- **Process Discovery**: Counts running `hax` sessions and `agy` subagents in real time via zero-fork `/proc` scan.
+- **Quota & Token Gauging**: Tracks total session input/output tokens, cache hit ratio, turn latency, and context window fill percentage on the LCD gauge bar.
+- **Account Rotation**: Scans active Google/Agy credentials in `~/.config/hax/agy-accounts/`.
+- **Reactive RGB Alerts**: Flashes red on 429 quota exhaustion; pulses cyan while agents are executing; flashes green when all background tasks complete.
+
+Run directly or in the background:
+```bash
+# Run interactively
+./examples/plugins/hax_cockpit.py
+
+# Run as background daemon
+./examples/plugins/hax_cockpit.py --daemon
+```

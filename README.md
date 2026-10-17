@@ -180,7 +180,12 @@ sock.sendall(json.dumps({
 }).encode() + b"\n")
 ```
 
-See [docs/PLUGINS.md](docs/PLUGINS.md) for full documentation, wire protocol details, and ready-to-run examples in Bash and Python.
+Ready-to-run reference plugins included in `examples/plugins/`:
+- `hax_cockpit.py`: Live AI agent telemetry, active `hax`/`agy` subagents, token burn rates, account rotation, context gauge, and 429 quota alerts.
+- `disk_monitor.py`: Real-time storage filesystem usage and capacity progress bar.
+- `clock_ticker.sh`: Minimalist shell clock and system uptime ticker.
+
+See [docs/PLUGINS.md](docs/PLUGINS.md) for full API documentation, wire protocol details, and systemd service templates.
 
 ---
 
