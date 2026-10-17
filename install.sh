@@ -37,6 +37,7 @@ Options:
   --prefix <dir>       Installation prefix for binaries (default: /usr/local)
   --sysconfdir <dir>   Configuration directory (default: /etc)
   --datadir <dir>      Data directory for desktop/icons (default: /usr/share)
+  --deb                Build standalone Debian .deb package via tools/build-deb.sh
   --no-build           Skip cargo build (use pre-compiled target/release binaries)
   --no-service         Skip installing or enabling systemd service
   --no-udev            Skip installing udev rules
@@ -44,6 +45,7 @@ Options:
 Examples:
   sudo ./install.sh             # Full system installation
   ./install.sh --user           # User-space desktop & binary installation
+  ./install.sh --deb            # Build .deb package for release
   sudo ./install.sh --uninstall # Clean removal of all components
 EOF
 }
@@ -54,6 +56,10 @@ while (( $# > 0 )); do
         -h|--help)
             print_usage
             exit 0
+            ;;
+        --deb)
+            shift
+            exec "$SCRIPT_DIR/tools/build-deb.sh" "$@"
             ;;
         -u|--uninstall)
             DO_UNINSTALL=1

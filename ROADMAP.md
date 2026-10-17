@@ -118,4 +118,11 @@ A modern Linux hardware control suite for the Logitech G510 and G510s Gaming Key
   - Deployment of udev rules and systemd service `g510-status.service` with automatic user detection and enablement.
   - XDG desktop and icon database cache synchronization (`update-desktop-database`, `gtk-update-icon-cache`, `kbuildsycoca6`).
   - Full clean uninstall routine (`./install.sh --uninstall`) leaving zero residue.
+- [x] **Standard Debian (.deb) Package Builder (`tools/build-deb.sh` & `./install.sh --deb`)**:
+  - Reproducible FHS package builder assembling stripped binaries, udev rules, system/user systemd service units, desktop files, multi-resolution icons, troff man pages (`g510d.1`, `g510ctl.1`, `g510tui.1`), copyright, and changelog.
+  - Automated SHA256 checksum generation in `dist/`.
+  - Zero Lintian errors (`lintian dist/*.deb`).
+  - Verified via live `dpkg -i` on Debian 13 with automated postinst/prerm/postrm hooks.
+- [x] **Automated GitHub Release Publishing (`--release`)**:
+  - Built-in GitHub CLI (`gh release create`) publishing pipeline to upload release `.deb` packages and SHA256 checksums to GitHub with auto-generated release notes.
 

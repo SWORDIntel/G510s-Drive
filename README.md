@@ -40,7 +40,24 @@ cd G510s-Drive
 - **Terminal Launch**: Or launch anytime via `g510tui` or `g510ctl tui`.
 - **Favicon & Assets**: Multi-frame `favicon.ico` (16, 32, 48, 64) and high-res logos installed to `/usr/local/share/g510/` and `/usr/share/icons/hicolor/`.
 
-### 2.2 Manual Compilation & Testing (Developer Workflow)
+### 2.2 Debian (.deb) Package Builder & GitHub Releases
+
+To build a standalone, Lintian-clean Debian package (`.deb`) complete with troff manual pages (`g510d(1)`, `g510ctl(1)`, `g510tui(1)`), udev rules, systemd units, and desktop icons:
+
+```bash
+# Build .deb package (saved to dist/g510s-drive_<version>_<arch>.deb)
+./tools/build-deb.sh
+# or via installer shortcut:
+./install.sh --deb
+
+# Install package directly with dpkg or apt
+sudo apt install ./dist/g510s-drive_0.2.0_amd64.deb
+
+# Build and automatically publish to GitHub Releases (via gh CLI):
+./tools/build-deb.sh --release
+```
+
+### 2.3 Manual Compilation & Testing (Developer Workflow)
 
 ```bash
 # Debian / Ubuntu dependencies
@@ -53,7 +70,7 @@ cargo build --release
 cargo test --release
 ```
 
-### 2.2 Configure Udev Rules (Non-Root Permissions)
+### 2.4 Configure Udev Rules (Non-Root Permissions)
 
 Install `/etc/udev/rules.d/70-logitech-g510.rules` so that user session processes (in group `plugdev`) can write to the LCD, inject keystrokes via `/dev/uinput`, and adjust LED backlighting without root permissions:
 
@@ -77,7 +94,7 @@ EOF
 sudo udevadm control --reload-rules && sudo udevadm trigger -s hidraw -s input -s leds
 ```
 
-### 2.3 Enable Boot-on-Boot Systemd Service
+### 2.5 Enable Boot-on-Boot Systemd Service
 
 To ensure the daemon starts automatically on system boot and restarts cleanly:
 

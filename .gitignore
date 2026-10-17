@@ -1,5 +1,8 @@
 build/
 target/
+dist/
+*.deb
+*.deb.sha256
 __pycache__/
 *.pyc
 *.o

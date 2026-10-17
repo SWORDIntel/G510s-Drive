@@ -10,6 +10,11 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 pub fn socket_path() -> PathBuf {
+    if let Ok(env_path) = std::env::var("G510_SOCKET") {
+        if !env_path.trim().is_empty() {
+            return PathBuf::from(env_path.trim());
+        }
+    }
     let uid = unsafe { libc::getuid() };
     let run_dir = PathBuf::from(format!("/run/user/{uid}"));
     if run_dir.is_dir() {
