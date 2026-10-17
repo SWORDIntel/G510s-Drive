@@ -1,448 +1,224 @@
-# G510s-Drive — Logitech G510 / G510s Linux Driver & Plugin Engine
+# Logitech G510 & G510s Linux Control Suite ⌨️📺
 
-A native Linux hardware control suite, interactive multi-page LCD ecosystem, 54-key macro orchestration matrix, and extensible IPC plugin engine for the **Logitech G510 and G510s Gaming Keyboards** (`046d:c22d` / `046d:c22e`) on Debian 13 (Trixie) and Linux 7.x kernels.
+> **A fast, lightweight, and modern Linux driver & desktop control suite for the Logitech G510 and G510s gaming keyboards.**  
+> Built from scratch in native Rust. Gives you a working GamePanel LCD, custom RGB lighting, 54 macro shortcuts, and an interactive control center — without frozen typing or bloated background processes.
 
----
-
-## 1. Supported Hardware & Architecture
-
-- **Hardware**: Logitech G510 (`046d:c22d` without audio, `046d:c22e` with USB audio).
-- **LCD Display**: 160 × 43 monochrome GamePanel display (Output Report 3, 992-byte packed frame).
-- **Driver Model**: Direct kernel `hidraw` transport (`/dev/g510-lcd`). Upstream `hid-lg-g15` remains permanently attached in the kernel at all times, preserving standard typing, multimedia controls, and sysfs RGB lighting without driver detachment or keyboard freezes.
-- **Native Rust Core**: Background daemon (`g510d`) and command-line utility (`g510ctl`) written in native Rust with `embedded-graphics` 0.8, consuming only **~1.3 MB RAM** (<15% of the legacy Python prototype).
-- **Extensible IPC Plugin Engine**: Embedded Unix Domain Socket server (`/run/user/<uid>/g510d.sock`) allowing any programming language or shell script to dynamically register custom LCD screens, push gauges, display toast overlays, and trigger reactive RGB alerts.
+[![Release](https://img.shields.io/github/v/release/SWORDIntel/G510s-Drive?color=red&label=release)](https://github.com/SWORDIntel/G510s-Drive/releases)
+[![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Debian%20%7C%20Ubuntu%20%7C%20Arch%20%7C%20Fedora-orange)](https://github.com/SWORDIntel/G510s-Drive)
+[![RAM Usage](https://img.shields.io/badge/memory-~1.5%20MB%20RAM-brightgreen)](https://github.com/SWORDIntel/G510s-Drive)
 
 ---
 
-## 2. Quick Start & Installation
+## Why this exists
 
-### 2.1 Automated One-Command Installation (Recommended)
+If you've ever tried using a Logitech G510 or G510s on modern Linux, you've probably run into the classic problems:
+- Legacy `g15daemon` is unmaintained, requires ancient libraries, and frequently segfaults.
+- Writing to the screen used to require detaching kernel drivers, which froze your typing while the LCD updated.
+- Python-based rewrites consumed 50–100MB of RAM just to show a CPU graph.
 
-The repository provides an all-in-one automated installer (`install.sh`) that compiles release binaries, configures udev non-root seat permissions, installs and starts the systemd service, deploys multi-resolution desktop icons (16×16 to 512×512 + `favicon.ico`), registers the XDG Start Menu launcher (`Logitech G510s Control Suite`), and refreshes KDE Plasma / GTK application caches:
+**This project solves that cleanly:**
+- **Zero typing lag**: Uses native Linux `hidraw` on Interface 1. The standard `hid-lg-g15` kernel driver stays attached, so your typing, media keys, and gaming switches never freeze.
+- **Ultra-lightweight**: Built in Rust. The background daemon (`g510d`) runs silently in the background using just **~1.5 MB of RAM**.
+- **Modern Desktop Ready**: Includes an interactive terminal UI (TUI), desktop Start Menu entry, app icons, and an extensible plugin system.
+
+---
+
+## What works out of the box
+
+| Feature | Description |
+|---|---|
+| 📺 **160×43 GamePanel LCD** | Multi-screen carousel showing live CPU/RAM/temps, network speeds & IP, security stats, media player track info, and pop-up notifications. |
+| 🎨 **Full RGB Backlighting** | Set any color or brightness, switch between profiles, or trigger pulsing / flashing reactive alert animations. |
+| ⌨️ **54 Dedicated Macro Slots** | 18 physical G-keys across 3 profiles (M1, M2, M3). Map terminal commands, keystrokes (Copy, Paste, Undo), or app launchers. |
+| 🔴 **On-The-Fly Macro Recording** | Hit the physical **MR** key, tap a G-key, type your shortcut, and hit **MR** again to save. |
+| 🎛️ **Interactive Control Center** | A full-featured terminal dashboard (`g510tui`) to tune lighting, macros, and screens in real-time. |
+| 🔊 **Audio & Mic Mute Sync** | Physical mute buttons automatically sync with PipeWire / PulseAudio and show status toasts on the LCD. |
+| 🔌 **Custom Screen API** | Push your own custom dashboards or stats from Python, Bash, Node, or Go in 3 lines of code. |
+
+---
+
+## Quick Start: Get up and running in 30 seconds
+
+### Option 1: Install the `.deb` package (Debian / Ubuntu / Linux Mint)
+
+Download the latest `.deb` directly from the [GitHub Releases page](https://github.com/SWORDIntel/G510s-Drive/releases/latest) or install via terminal:
 
 ```bash
-# Clone the repository (if not already local)
+# Download and install the prebuilt package
+sudo apt install ./g510s-drive_0.2.0_amd64.deb
+```
+
+That's it! The installer automatically sets up udev permissions, enables the background service, and adds the app to your Start Menu.
+
+### Option 2: Build and install from source
+
+If you want to compile locally or you're running a non-Debian distribution:
+
+```bash
+# 1. Clone the repository
 git clone https://github.com/SWORDIntel/G510s-Drive.git
 cd G510s-Drive
 
-# Run full system installation (prompts for sudo if non-root)
+# 2. Run the automated installer
 ./install.sh
 ```
 
-#### Installer Features & Options
-- `sudo ./install.sh`: Full system install to `/usr/local/bin`, `/etc/udev/rules.d`, and `/etc/systemd/system`.
-- `./install.sh --user`: User-space install to `~/.local/bin` and `~/.local/share/applications` without sudo.
-- `./install.sh --no-build`: Fast deployment reusing existing release binaries.
-- `sudo ./install.sh --uninstall`: Clean uninstallation of binaries, desktop files, icons, udev rules, and systemd units.
+The installer handles cargo release compilation, installs the binaries to `/usr/local/bin`, installs icons & desktop entries, and starts the systemd service.
 
-#### Desktop & Start Menu Integration
-- **Start Menu**: Launchable directly from your application launcher (KDE Kickoff, GNOME, XFCE) under **Settings → Hardware** as `Logitech G510s Control Suite`.
-- **Terminal Launch**: Or launch anytime via `g510tui` or `g510ctl tui`.
-- **Favicon & Assets**: Multi-frame `favicon.ico` (16, 32, 48, 64) and high-res logos installed to `/usr/local/share/g510/` and `/usr/share/icons/hicolor/`.
+---
 
-### 2.2 Debian (.deb) Package Builder & GitHub Releases
+## How to use it
 
-To build a standalone, Lintian-clean Debian package (`.deb`) complete with troff manual pages (`g510d(1)`, `g510ctl(1)`, `g510tui(1)`), udev rules, systemd units, and desktop icons:
+### 1. Launch the Control Center (TUI)
+
+Launch **Logitech G510s Control Suite** directly from your desktop **Start Menu / Application Finder** under **Settings → Hardware**, or run from any terminal:
 
 ```bash
-# Build .deb package (saved to dist/g510s-drive_<version>_<arch>.deb)
+g510tui
+```
+
+```text
+┌── Logitech G510s Control Suite ─────────────────────────────────────────────────────────────┐
+│ [1: Lighting & RGB]   [2: Macro Keys]   [3: LCD Screens]   [4: Audio & Hardware]          │
+├─────────────────────────────────────────────────────────────────────────────────────────────┤
+│  Color Palette:                                Brightness: [====================] 100%      │
+│  [● Dev Green]   [● Security Red]  [● Media Blue]                                          │
+│  [● Amber Glow]  [● Cyan Wave]     [● Royal Purple]                                         │
+│                                                                                             │
+│  G-Key Assignments (Profile: M2 Security Lab - Red):                                        │
+│  G1: Open Terminal       G7: Git Status             G13: Copy (Ctrl+C)                     │
+│  G2: System Monitor      G8: Clear Screen           G14: Paste (Ctrl+V)                    │
+│  G3: Network Page        G9: Diagnostic Toast       G15: Undo (Ctrl+Z)                     │
+│                                                                                             │
+│  Keybindings: Tab: Switch Tab | ↑/↓: Navigate | ←/→: Adjust | Enter: Apply | q: Quit        │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Tab**: Cycle between tabs (Lighting, Macros, LCD screens, Audio diagnostics).
+- **Arrow Keys**: Pick color swatches, adjust brightness slider, or navigate G-keys.
+- **Enter / Space**: Apply colors or open the action preset picker.
+- **q / Esc**: Exit cleanly.
+
+---
+
+### 2. Using the physical keyboard controls
+
+You don't need any software open while working or gaming. Use the keyboard's hardware buttons directly:
+
+- **LCD Buttons (under the screen)**:
+  - **L1 / L2**: Flip between screens (CPU & Thermals, Network & IP, Security, Media Player, Custom Plugins).
+  - **L5 (Menu)**: Jump straight back to Screen 1 (System stats).
+- **M-Keys (top left)**:
+  - **M1**: Daily Driving / Coding profile (Backlight: Green).
+  - **M2**: Security / System Lab profile (Backlight: Red).
+  - **M3**: Multimedia & Streaming profile (Backlight: Blue).
+- **MR Key (Quick Record)**:
+  - Tap **MR** (indicator LED lights up).
+  - Tap the G-key you want to program (e.g. **G1**).
+  - Type your shortcut or command.
+  - Tap **MR** again to save.
+- **Mute Buttons**:
+  - Headphone and mic mute buttons toggle your system audio in PipeWire/PulseAudio and display visual toasts on the LCD.
+
+---
+
+## Handy CLI Commands
+
+Prefer the command line? `g510ctl` lets you script or control everything:
+
+```bash
+# Change keyboard color
+g510ctl rgb red              # Pure red
+g510ctl rgb '#00ffcc'        # Custom hex color
+g510ctl rgb green --brightness 128
+
+# Switch M-profile
+g510ctl profile 1            # M1
+g510ctl profile 2            # M2 (Red)
+
+# Pop up a notification overlay on the LCD
+g510ctl toast "Build Completed in 12s!"
+
+# Switch LCD page directly
+g510ctl page 1               # System stats (CPU/RAM/Temp)
+g510ctl page 2               # Network speeds & IP
+g510ctl page 4               # Spotify/Media player
+
+# Trigger a reactive alert animation (great for build scripts or alarms)
+g510ctl alert flash --color "#ff0000" --times 3
+g510ctl alert pulse --color "#00ffff" --duration 4.0
+
+# Toggle microphone mute
+g510ctl mute mic --toggle
+```
+
+---
+
+## Custom LCD Plugins (Make your own screens)
+
+You can write plugins in any language. The daemon listens on a standard local Unix socket (`/run/user/<uid>/g510d.sock`) using simple JSON messages.
+
+### Example: Python Script (under 10 lines)
+
+```python
+import socket, json
+
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+sock.connect(f"/run/user/{os.getuid()}/g510d.sock")
+
+# Register a custom screen in the carousel
+sock.sendall(json.dumps({
+    "cmd": "register_page",
+    "id": "my_stats",
+    "title": "STATS",
+    "line1": "Servers:  12 Online",
+    "line2": "Database: Healthy",
+    "line3": "Latency:  14ms",
+    "bar": 92.0
+}).encode() + b"\n")
+```
+
+See [docs/PLUGINS.md](docs/PLUGINS.md) for full documentation, wire protocol details, and ready-to-run examples in Bash and Python.
+
+---
+
+## Building a `.deb` package for release
+
+The repository includes a packaging tool that builds standard, reproducible Debian packages:
+
+```bash
+# Build the package (saved to dist/g510s-drive_<version>_<arch>.deb)
 ./tools/build-deb.sh
-# or via installer shortcut:
+# or:
 ./install.sh --deb
 
-# Install package directly with dpkg or apt
-sudo apt install ./dist/g510s-drive_0.2.0_amd64.deb
-
-# Build and automatically publish to GitHub Releases (via gh CLI):
+# Build and automatically publish to GitHub Releases (via GitHub CLI):
 ./tools/build-deb.sh --release
 ```
 
-### 2.3 Manual Compilation & Testing (Developer Workflow)
+---
 
+## Frequently Asked Questions (FAQ)
+
+#### Does typing freeze when the screen updates?
+**No.** Older legacy tools detached the keyboard driver to send USB frames, causing dropped keystrokes. This driver writes directly to the Linux kernel `hidraw` interface for the LCD while leaving the keyboard input driver completely intact.
+
+#### Do I need to run `sudo` to use `g510ctl` or the TUI?
+**No.** The installer deploys udev rules that grant your user session access through the standard `plugdev` group and `uaccess` tags.
+
+#### How do I remove it if I ever want to?
+Simply run:
 ```bash
-# Debian / Ubuntu dependencies
-sudo apt update && sudo apt install -y build-essential pkg-config libudev-dev
-
-# Build release binaries (g510ctl, g510d, g510tui)
-cargo build --release
-
-# Run 23 unit tests
-cargo test --release
+sudo ./install.sh --uninstall
+# or if installed via .deb:
+sudo apt remove g510s-drive
 ```
-
-### 2.4 Configure Udev Rules (Non-Root Permissions)
-
-Install `/etc/udev/rules.d/70-logitech-g510.rules` so that user session processes (in group `plugdev`) can write to the LCD, inject keystrokes via `/dev/uinput`, and adjust LED backlighting without root permissions:
-
-```bash
-sudo tee /etc/udev/rules.d/70-logitech-g510.rules <<'EOF'
-# Logitech G510 / G510s Gaming Keyboard (046d:c22d, 046d:c22e)
-
-# Grant user session access to G510 LCD hidraw device on Interface 1
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c22[de]", DEVPATH=="*1.1/*", SYMLINK+="g510-lcd", TAG+="uaccess", GROUP="plugdev", MODE="0660"
-
-# Grant user session access to G510 input devices
-SUBSYSTEM=="input", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c22[de]", TAG+="uaccess", GROUP="plugdev", MODE="0660"
-
-# Grant access to uinput for macro injection
-KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", GROUP="plugdev", MODE="0660"
-
-# Grant access to G510 LED attributes for brightness and RGB multi_intensity
-SUBSYSTEM=="leds", KERNEL=="g15*", RUN+="/bin/sh -c 'chgrp plugdev /sys%p/brightness /sys%p/multi_intensity 2>/dev/null || true; chmod g+w /sys%p/brightness /sys%p/multi_intensity 2>/dev/null || true'"
-EOF
-
-sudo udevadm control --reload-rules && sudo udevadm trigger -s hidraw -s input -s leds
-```
-
-### 2.5 Enable Boot-on-Boot Systemd Service
-
-To ensure the daemon starts automatically on system boot and restarts cleanly:
-
-```bash
-sudo tee /etc/systemd/system/g510-status.service <<'EOF'
-[Unit]
-Description=Logitech G510 Keyboard & LCD Native Daemon
-After=multi-user.target systemd-udevd.service
-Wants=multi-user.target
-
-[Service]
-Type=simple
-User=john
-WorkingDirectory=/home/john/Documents/G510s-Drive
-ExecStart=/usr/local/bin/g510d --interval 1.0
-Restart=always
-RestartSec=3
-TimeoutStopSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now g510-status.service
-```
-
-Verify service status:
-```bash
-systemctl status g510-status.service
-systemctl is-enabled g510-status.service   # outputs: enabled
-```
+It cleans up all binaries, desktop entries, icon files, udev rules, and systemd units cleanly without leaving residue.
 
 ---
 
-## 3. LCD Carousel & Interactive Applets
+## License
 
-The background daemon (`g510d`) maintains a carousel of interactive applets rendered on the 160×43 GamePanel LCD. You can switch between screens at any time using the physical LCD menu buttons:
-- **L1**: Cycle to Previous Page (with toast overlay confirmation).
-- **L2**: Cycle to Next Page (with toast overlay confirmation).
-- **L5**: Jump to Home (`[1/N:SYS]`).
-
-### Built-in Carousel Pages
-
-| Page | Header | Features |
-|---|---|---|
-| **1** | `[1/N:SYS]` | **System & Thermals**: Live CPU % bar, RAM % bar, CPU core temperature (°C), and 1-minute load average. |
-| **2** | `[2/N:NET]` | **Network & VPN**: Active interface discovery, local IP address, live RX/TX throughput speedometers (kB/s), and VPN tunnel detection. |
-| **3** | `[3/N:SEC]` | **Security & Lab Ticker**: Failed SSH attempts in the last hour, active QEMU/KVM VMs, and running Docker containers. |
-| **4** | `[4/N:MEDIA]` | **MPRIS Media Player**: Currently playing track title, artist name, and playback status via MPRIS (`playerctl`). |
-| **5** | `[5/N:AGENT]` | **AI Workbench State**: Real-time status display for workbench coding assistants (`STATE`, `TASK`, `ROLE`). |
-| **6+** | `[X/N:TITLE]` | **Dynamic Plugin Pages**: Custom pages registered dynamically over IPC (see Section 6). |
-
-You can also jump directly to any page via CLI:
-```bash
-g510ctl page 1    # Jump to SYS
-g510ctl page 2    # Jump to NET
-g510ctl page 3    # Jump to SEC
-```
-
----
-
-## 4. 54-Key Macro Matrix & Hardware Profiles
-
-The keyboard features 18 physical G-keys and 3 hardware profile keys (M1, M2, M3), yielding **54 dedicated macro slots** configured in `~/.config/g510s-drive/config.json`.
-
-- **M1 (Development & Daily Driving — Green `#00dc00`)**:
-  - G1–G6: Workspace and window navigation (Terminal, Konsole, Git status, cargo check, test, release).
-  - G7–G12: Git automation shortcuts, terminal clear, system status toasts, and agent page jump.
-  - G13–G18: Fast keystroke shortcuts via `/dev/uinput` (Copy, Paste, Find, Save, Undo, Close Tab).
-- **M2 (Workbench & Security Lab — Red `#dc0000`)**:
-  - G1–G6: Security page jump, network page jump, diagnostic toasts, docker inspection, SSH journal.
-  - G7–G12: Network audit triggers, sandbox checks, snapshot states, and clipboard history.
-  - G13–G18: Fast forensics, lab triggers, and security monitoring actions.
-- **M3 (Communications & Multimedia — Blue `#0000dc`)**:
-  - G1–G6: Multimedia playback (Play/Pause, Next Track, Prev Track, Vol+, Vol-, Media page jump).
-  - G7–G12: Audio output mute, microphone toggle, screen lock (`Ctrl+Alt+L`), and communications triggers.
-- **On-the-Fly MR Recording**:
-  - Press physical **MR** key to arm recording (MR LED turns ON, LCD displays toast).
-  - Select target G-key (G1–G18) to record into.
-  - Keystrokes are captured via `/dev/uinput` and saved directly to the active profile in `config.json`.
-  - Press **MR** again to disarm and save (MR LED turns OFF, LCD confirms save).
-
----
-
-## 5. Reactive RGB Alerts & Audio Mute Synchronization
-
-### Reactive RGB Lighting Alerts
-The keyboard backlighting supports asynchronous hardware animation alerts that automatically revert to the active profile's baseline color upon completion:
-```bash
-# Flash alert (e.g. on test failure or security event)
-g510ctl alert flash --color "#ff0000" --times 3
-
-# Pulse alert (smooth sinusoidal breathing wave while task/agent is active)
-g510ctl alert pulse --color "#00ffff" --duration 3.5
-```
-
-### Hardware Audio & Microphone Mute Sync
-The physical mute keys are synchronized with PipeWire / PulseAudio:
-- Pressing **Microphone Mute** toggles the default audio source, updates the LCD (`MICROPHONE [MUTED]` / `[ACTIVE]`), and flashes reactive amber lighting.
-- Pressing **Headphone Mute** toggles the default audio sink with LCD toast confirmation.
-- Query or toggle mute via CLI:
-  ```bash
-  g510ctl mute mic            # Query microphone status
-  g510ctl mute mic --toggle   # Toggle microphone mute
-  g510ctl mute audio --toggle # Toggle speaker/sink mute
-  ```
-
----
-
-## 6. Extensible IPC Plugin Engine & API Specification
-
-The daemon embeds a high-performance Unix Domain Socket server at `/run/user/<uid>/g510d.sock` (mode `0600`), using line-delimited JSON (`jsonlines`) framing.
-
-See [docs/PLUGINS.md](docs/PLUGINS.md) for the complete developer guide and tutorial.
-
-### 6.1 Wire Protocol
-
-- **Endpoint**: `/run/user/<uid>/g510d.sock` (fallback `/tmp/g510d.sock`).
-- **Framing**: Each command is a single JSON line terminated by `\n`.
-- **Response**: The daemon responds with a single JSON line terminated by `\n`:
-  ```json
-  {"ok": true, "data": { ... }, "error": null}
-  ```
-
-### 6.2 API Command Reference
-
-#### 1. `ping`
-Check daemon responsiveness and round-trip latency.
-- **Request**: `{"cmd": "ping"}`
-- **Response**: `{"ok": true, "data": {"status": "pong"}}`
-
-#### 2. `register_page`
-Registers a new dynamic page or overwrites an existing page in the LCD carousel.
-- **Request**:
-  ```json
-  {
-    "cmd": "register_page",
-    "id": "disk",
-    "title": "DISK",
-    "line1": "/:     42GB free (68%)",
-    "line2": "/home: 180GB free (85%)",
-    "line3": "I/O:   1.2MB/s read",
-    "bar": 68.0
-  }
-  ```
-- **Fields**:
-  - `id` (`string`, required): Unique identifier (e.g. `"disk"`).
-  - `title` (`string`, required): Short title shown in header `[X/N:TITLE]`. Recommended: 3–7 uppercase characters.
-  - `line1` (`string`): First text row (max 26 characters).
-  - `line2` (`string`): Second text row (max 26 characters).
-  - `line3` (`string`): Third text row (max 26 characters).
-  - `bar` (`float`, optional): Progress gauge `0.0` to `100.0`. If `line3` is empty, renders full-width (156px) across bottom; if `line3` is present, renders right-aligned (58px).
-- **Response**: `{"ok": true}`
-
-#### 3. `update_page`
-Updates specific text rows or gauge values on an already registered dynamic page.
-- **Request**:
-  ```json
-  {
-    "cmd": "update_page",
-    "id": "disk",
-    "line1": "/:     41GB free (67%)",
-    "bar": 67.0
-  }
-  ```
-- **Response**: `{"ok": true}`
-
-#### 4. `unregister_page`
-Removes a dynamic page from the carousel and reclaims its slot.
-- **Request**: `{"cmd": "unregister_page", "id": "disk"}`
-- **Response**: `{"ok": true}`
-
-#### 5. `list_pages`
-Lists all currently active dynamic pages.
-- **Request**: `{"cmd": "list_pages"}`
-- **Response**: `{"ok": true, "data": [{"id": "disk", "title": "DISK", "line1": "...", ...}]}`
-
-#### 6. `set_page`
-Forces the carousel to jump to a specific page index (1-based index).
-- **Request**: `{"cmd": "set_page", "number": 6}`
-- **Response**: `{"ok": true}`
-
-#### 7. `toast`
-Displays a modal pop-up overlay box on the LCD display over any screen.
-- **Request**:
-  ```json
-  {
-    "cmd": "toast",
-    "message": "COMPILATION SUCCESS\n0 errors, 0 warnings",
-    "duration_ms": 3000
-  }
-  ```
-- **Response**: `{"ok": true}`
-
-#### 8. `alert`
-Triggers an asynchronous reactive RGB lighting animation.
-- **Request (Flash)**: `{"cmd": "alert", "mode": "flash", "color": "#ff0000", "times": 3}`
-- **Request (Pulse)**: `{"cmd": "alert", "mode": "pulse", "color": "#00ffcc", "duration": 3.0}`
-- **Response**: `{"ok": true}`
-
-#### 9. `get_status`
-Queries daemon status, active carousel page, and registered plugin count.
-- **Request**: `{"cmd": "get_status"}`
-- **Response**:
-  ```json
-  {
-    "ok": true,
-    "data": {
-      "daemon": "g510d",
-      "version": "0.2.0",
-      "active_page": 1,
-      "dynamic_pages_count": 0,
-      "socket": "/run/user/1000/g510d.sock"
-    }
-  }
-  ```
-
----
-
-### 6.3 CLI Plugin Management with `g510ctl`
-
-```bash
-# Ping the daemon IPC socket
-g510ctl plugin ping
-
-# Register a dynamic page
-g510ctl plugin register disk --title "DISK" \
-  --line1 "Root: 45GB free" \
-  --line2 "Home: 180GB free" \
-  --line3 "I/O:  Idle" \
-  --bar 68.5
-
-# Update dynamic telemetry
-g510ctl plugin update disk --line1 "Root: 44GB free" --bar 67.0
-
-# List registered plugins
-g510ctl plugin list
-
-# Switch carousel to the registered plugin page
-g510ctl page 6
-
-# Unregister the plugin
-g510ctl plugin unregister disk
-```
-
----
-
-### 6.4 Reference Plugins
-
-Executable reference plugins are included in the repository under [`examples/plugins/`](examples/plugins/):
-
-1. **Python Disk Monitor** ([`examples/plugins/disk_monitor.py`](examples/plugins/disk_monitor.py)):
-   - Connects directly to the Unix Domain Socket with pure standard library (`socket`, `json`, `shutil`).
-   - Registers `DISK` page, periodically updates root/home usage, and cleanly unregisters on SIGINT/SIGTERM.
-   - Run: `python3 examples/plugins/disk_monitor.py`
-
-2. **Shell Clock & Uptime Ticker** ([`examples/plugins/clock_ticker.sh`](examples/plugins/clock_ticker.sh)):
-   - Uses `g510ctl plugin` commands inside a Bash script.
-   - Pushes live time, date, system uptime, and a second-hand gauge bar (`0..100%`).
-   - Run: `bash examples/plugins/clock_ticker.sh`
-
----
-
-## 7. Interactive Terminal User Interface (TUI)
-
-An interactive full-screen terminal control interface built with `ratatui` and `crossterm` is available via `g510tui` or `g510ctl tui`:
-
-```bash
-# Launch interactive TUI
-g510tui
-# or
-g510ctl tui
-```
-
-### TUI Features & Keybindings
-
-- **Tab Navigation**:
-  - `Tab` / `Shift-Tab` or `1` / `2` / `3` / `4` (or `F1`–`F4`): Switch between tabs.
-- **Tab 1: Lighting & RGB**:
-  - `Up` / `Down` (`k` / `j`): Select from curated color swatches (Dev Green, Security Red, Media Blue, Amber, Cyan, Purple, Yellow, White, Off).
-  - `Left` / `Right` (`h` / `l` or `-` / `+`): Adjust brightness smoothly (0–255) with visual gauge bar.
-  - `Enter` / `Space`: Apply selected color and brightness directly to hardware.
-  - `t`: Toggle target mode between live active RGB and USB power-on reset default.
-  - `f`: Test hardware flash alert (flashes 3x in selected color).
-  - `b`: Test hardware breathing pulse (smooth sinusoidal 3.0s wave).
-- **Tab 2: Macro Controls**:
-  - `m` / `Left` / `Right`: Switch active profile (M1 Dev, M2 SecLab, M3 Media).
-  - `Up` / `Down` (`k` / `j`): Select target G-key (G1 to G18).
-  - `Enter` / `a`: Open interactive Action Preset Picker modal (assign Terminal, Git, Cargo, Chords, Media, LCD jumps).
-  - `d` / `Delete`: Clear / Unassign macro for selected key.
-  - `s`: Save macro configuration to `~/.config/g510s-drive/config.json`.
-  - `r`: Reload configuration from disk.
-  - `c`: Set profile theme RGB to active lighting color.
-- **Tab 3: LCD & IPC Applets**:
-  - `Up` / `Down`: Select from built-in carousel pages (SYS, NET, SEC, MEDIA, AGENT).
-  - `Enter`: Jump physical LCD directly to selected page over IPC.
-  - `t`: Send test modal toast notification to LCD screen.
-  - `p`: Ping daemon IPC socket to test latency.
-  - View list of external dynamic plugins currently registered over IPC.
-- **Tab 4: Audio & Status Diagnostics**:
-  - `m`: Toggle microphone mute via PipeWire / PulseAudio.
-  - `a`: Toggle audio sink mute.
-  - View real-time daemon status (`g510d` online/offline, socket path, version).
-  - View hardware transport nodes (`/dev/g510-lcd`, `/dev/input/event*`, sysfs paths).
-  - `r`: Refresh diagnostics.
-- **Global**:
-  - `q` / `Esc`: Exit TUI cleanly (restores terminal raw mode and alternate screen).
-
----
-
-## 8. Command-Line Reference Summary (`g510ctl`)
-
-```text
-g510ctl [COMMAND]
-
-Commands:
-  probe                 Probe Logitech G510 USB and evdev devices
-  status                Display current LED, daemon IPC, and hardware status (JSON)
-  rgb <COLOR>           Set RGB backlighting color (#RRGGBB)
-  profile <NUM>         Switch active profile indicator LED (1, 2, or 3)
-  text <MESSAGE>        Render static text on the LCD screen (--invert, --hold)
-  page <NUM>            Switch active LCD carousel page (1..5 built-in, 6+ dynamic)
-  toast <MESSAGE>       Display a pop-up toast notification overlay (--duration-ms)
-  alert [MODE]          Trigger reactive RGB alert animation (--color, --times, --duration)
-  mute <TARGET>         Query or toggle microphone/audio mute state (--toggle)
-  plugin <ACTION>       Manage dynamic LCD applet plugins over IPC (ping, register, update, unregister, list)
-  tui                   Launch interactive Terminal User Interface (TUI)
-  listen                Listen for and print G-keys, M-keys, and LCD buttons (--json)
-  run                   Run foreground macro execution engine
-  init-config           Initialize default macro configuration file
-```
-
----
-
-## 9. Verification & Test Suite
-
-All 23 unit tests pass in release mode:
-```bash
-cargo test --release
-```
-
-Test coverage includes:
-- Zero-allocation 992-byte Output Report 3 frame packing and pixel coordinate mapping.
-- Embedded graphics rasterization across all 5 built-in screens and dynamic plugin screens.
-- Full IPC request/response serialization, page registration, and lifecycle state management.
-- Terminal User Interface (TUI) state machines, preset validations, and profile cycling.
-- Linux evdev gaming keycode parsing and macro config loading.
-- Sysfs RGB multi-intensity hex string parsing and LED attribute manipulation.
-- Live telemetry CPU counters, memory calculations, and time string formatting.
-
+Released under the **GNU General Public License v2.0 or later** (GPL-2.0-or-later). See [`LICENSE`](LICENSE) for details.
+All Logitech, GamePanel, and G510s trademarks belong to Logitech International S.A.
