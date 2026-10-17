@@ -1,0 +1,13 @@
+[Unit]
+Description=Logitech G510 Control Deck G502 HERO Companion & RGB Sync Plugin
+After=g510-status.service ratbagd.service
+PartOf=g510-status.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 @@REPO_ROOT@@/examples/plugins/g502_deck.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

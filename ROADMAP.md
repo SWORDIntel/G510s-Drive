@@ -147,4 +147,15 @@ A modern Linux hardware control deck and driver for the Logitech G510 and G510s 
 - [x] **Physical LCD Softkey Action Routing (L3/L4)**: Mapped physical buttons L3 and L4 in `g510d` to write atomic IPC key event payloads (`/run/user/1000/g510-key-event.json`), enabling applet drilldown (L3 cycles Overview, Subagents, Account Pool) and interactive task abort (L4 sends `SIGTERM` to active subagent PID).
 - [x] **QIHSE Cluster Mesh & Redis Store Tracker (`qihse_mesh.py`)**: Distributed cluster monitoring applet probing Node 5 (`730xd:7115` sub-millisecond RTT), Node 1 (`t320:7101`), and local node Redis key counts (`127.0.0.1:6401` DBSIZE gauge) with automated `g510-qihse-mesh.service` systemd unit.
 
+---
+
+## Phase 10: Logitech G-Series Peripheral Ecosystem & G502 HERO Companion
+- [x] **Logitech G502 HERO Mouse Driver & Daemon Integration**: Enabled kernel HID++ 2.0 introspection via `ratbagd` and `piper`, exposing DPI stages (100–25,600 DPI), polling rate (125–1000Hz), 11 button remapping, and dual RGB lighting zones.
+- [x] **Real-Time Keyboard & Mouse RGB Synchronization**: Created sysfs `multi_intensity` monitor linking G510s keyboard profile colors (M1 Green, M2 Red, M3 Blue) directly to the G502 HERO LEDs (Palm Logo and DPI indicator bars).
+- [x] **G502 HERO GamePanel LCD Companion (`g502_deck.py`)**: Dedicated 160×43 GamePanel carousel applet showing active DPI, report rate, onboard profile, resolution stage, and synced RGB hex indicator with proportional gauge bar.
+- [x] **Physical LCD Softkey Action Routing for Mouse (L3/L4)**: Softkey L3 cycles mouse DPI resolution stages (with instant G510 on-screen toast feedback); Softkey L4 cycles onboard hardware profiles across mouse EEPROM memory slots.
+- [x] **Multi-Applet Softkey Isolation**: Updated `hax_cockpit.py` and `g502_deck.py` with `resolve_my_page()` to prevent cross-applet softkey collisions when navigating between pages.
+- [x] **Automated Systemd User Service (`g510-g502-deck.service`)**: Packaged unit template in `assets/g510-g502-deck.service.in` and enabled live user service.
+
+
 

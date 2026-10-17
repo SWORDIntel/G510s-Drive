@@ -374,6 +374,16 @@ class HaxCockpitPlugin:
             send_ipc({"cmd": "unregister_page", "id": PLUGIN_ID}, self.sock_path)
             self.registered = False
 
+    def resolve_my_page(self):
+        """Resolve current 1-indexed carousel page number for HAX COCKPIT."""
+        resp = send_ipc({"cmd": "list_pages"}, self.sock_path)
+        if resp and resp.get("ok"):
+            pages = resp.get("data", [])
+            for idx, p in enumerate(pages):
+                if p.get("id") == PLUGIN_ID:
+                    return 5 + idx + 1
+        return None
+
     def update_cycle(self):
         """Single telemetry collection and LCD update tick."""
         procs = scan_running_processes()
@@ -384,53 +394,56 @@ class HaxCockpitPlugin:
         hax_cnt = procs["hax_count"]
         agy_cnt = procs["agy_count"]
 
-        # 0. Check physical L3 / L4 softkeys
+        # 0. Check physical L3 / L4 softkeys (only when viewing HAX COCKPIT)
         ev = check_key_event()
         if ev and ev.get("ts", 0) > self.last_key_ts:
             self.last_key_ts = ev["ts"]
-            key = ev.get("key")
-            if key == "L3":
-                self.view_mode = (self.view_mode + 1) % 3
-                modes = ["OVERVIEW", "SUBAGENTS", "ACCOUNTS"]
-                send_ipc({
-                    "cmd": "toast",
-                    "message": f"VIEW: {modes[self.view_mode]}",
-                    "duration_ms": 1200,
-                }, self.sock_path)
-            elif key == "L4":
-                # Emergency Abort for active subagent
-                if procs["agy_details"]:
-                    sub_pid, _ = procs["agy_details"][0]
-                    try:
-                        os.kill(sub_pid, signal.SIGTERM)
-                        send_ipc({
-                            "cmd": "toast",
-                            "message": f"ABORTED AGY PID {sub_pid}",
-                            "duration_ms": 2500,
-                        }, self.sock_path)
-                        send_ipc({
-                            "cmd": "alert",
-                            "mode": "flash",
-                            "color": "#ffaa00",
-                            "times": 1,
-                            "duration": 1.0,
-                        }, self.sock_path)
-                    except Exception as e:
-                        send_ipc({
-                            "cmd": "toast",
-                            "message": f"KILL FAILED: {e}",
-                            "duration_ms": 2000,
-                        }, self.sock_path)
-                else:
+            my_page = self.resolve_my_page()
+            if my_page is None or ev.get("page") == my_page:
+                key = ev.get("key")
+                if key == "L3":
+                    self.view_mode = (self.view_mode + 1) % 3
+                    modes = ["OVERVIEW", "SUBAGENTS", "ACCOUNTS"]
                     send_ipc({
                         "cmd": "toast",
-                        "message": "NO SUBAGENTS RUNNING",
+                        "message": f"VIEW: {modes[self.view_mode]}",
                         "duration_ms": 1200,
                     }, self.sock_path)
+                elif key == "L4":
+                    # Emergency Abort for active subagent
+                    if procs["agy_details"]:
+                        sub_pid, _ = procs["agy_details"][0]
+                        try:
+                            os.kill(sub_pid, signal.SIGTERM)
+                            send_ipc({
+                                "cmd": "toast",
+                                "message": f"ABORTED AGY PID {sub_pid}",
+                                "duration_ms": 2500,
+                            }, self.sock_path)
+                            send_ipc({
+                                "cmd": "alert",
+                                "mode": "flash",
+                                "color": "#ffaa00",
+                                "times": 1,
+                                "duration": 1.0,
+                            }, self.sock_path)
+                        except Exception as e:
+                            send_ipc({
+                                "cmd": "toast",
+                                "message": f"KILL FAILED: {e}",
+                                "duration_ms": 2000,
+                            }, self.sock_path)
+                    else:
+                        send_ipc({
+                            "cmd": "toast",
+                            "message": "NO SUBAGENTS RUNNING",
+                            "duration_ms": 1200,
+                        }, self.sock_path)
 
         # 1. Format Views based on view_mode
         in_tok = telem["input_tokens"]
         context_pct = compute_context_percentage(telem["orch_model"], in_tok)
+        status = telem["subagent_status"]
 
         if self.view_mode == 1:
             # Mode 1: Subagent Drilldown
@@ -465,7 +478,6 @@ class HaxCockpitPlugin:
             else:
                 line1 = f"Orch:idle | Accs:{acc_count} RR"
 
-            status = telem["subagent_status"]
             if agy_cnt > 0 or status == "running":
                 sub_m = shorten_name(telem["subagent_model"] or "Gemini3.8Fl")
                 line2 = f"Agy:{sub_m} [RUN]"
