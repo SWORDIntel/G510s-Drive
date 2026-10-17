@@ -126,3 +126,13 @@ A modern Linux hardware control deck and driver for the Logitech G510 and G510s 
 - [x] **Automated GitHub Release Publishing (`--release`)**:
   - Built-in GitHub CLI (`gh release create`) publishing pipeline to upload release `.deb` packages and SHA256 checksums to GitHub with auto-generated release notes.
 
+---
+
+## Phase 8: Consumer-Ready Rebrand & Logitech G510 Control Deck
+- [x] **Rebrand Suite Identity**: Adopted **Logitech G510 Control Deck** (`G510-Deck` / `g510deck`) as the primary application name.
+- [x] **Control Deck Binary & Aliases**: Added `g510deck` standalone binary and `g510ctl deck` command, maintaining full backwards compatibility with `g510tui`.
+- [x] **Desktop Integration & Assets**: Generated `g510deck.desktop` Start Menu launcher, `g510deck.png` multi-resolution icon assets (16×16 to 512×512), and `g510deck.1.gz` troff manual page.
+- [x] **Debian Package Overhaul**: Updated Debian packaging to build `g510-deck_0.2.0_amd64.deb` with `Provides: g510s-drive`, `Replaces: g510s-drive`, and `Conflicts: g510s-drive` for seamless drop-in upgrades.
+- [x] **Consumer-Friendly Documentation**: Rewrote `README.md` to remove AI buzzwords, featuring ASCII terminal mockups, 30-second install guide, physical button cheat sheets, and FAQ.
+- [x] **GitHub Release v0.2.0 Assets**: Uploaded `g510-deck_0.2.0_amd64.deb` and SHA256 checksums to GitHub Release `v0.2.0`.
+
