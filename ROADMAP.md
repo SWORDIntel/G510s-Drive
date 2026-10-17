@@ -1,6 +1,6 @@
-# G510s-Drive — Project Roadmap
+# G510-Deck (Logitech G510 Control Deck) — Project Roadmap
 
-A modern Linux hardware control suite for the Logitech G510 and G510s Gaming Keyboard (`046d:c22d` / `046d:c22e`) on Debian 13 (Trixie) and Linux 7.x kernels.
+A modern Linux hardware control deck and driver for the Logitech G510 and G510s Gaming Keyboard (`046d:c22d` / `046d:c22e`) on Debian 13 (Trixie) and Linux 7.x kernels.
 
 ---
 

@@ -112,7 +112,11 @@ enum Commands {
         #[command(subcommand)]
         action: PluginAction,
     },
-    /// Launch interactive Terminal User Interface (TUI) for keyboard lighting, macros, and LCD controls
+    /// Launch interactive Logitech G510 Control Deck (TUI)
+    #[command(alias = "tui")]
+    Deck,
+    /// Launch interactive Terminal User Interface (alias for deck)
+    #[command(hide = true)]
     Tui,
 }
 
@@ -479,7 +483,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         },
-        Commands::Tui => {
+        Commands::Deck | Commands::Tui => {
             g510::tui::run()?;
         }
     }

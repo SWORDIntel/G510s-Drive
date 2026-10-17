@@ -240,7 +240,7 @@ impl App {
             audio_muted,
             hardware_snap,
             ipc_status: None,
-            status_msg: Some(("Logitech G510s Interactive TUI Initialized".to_string(), Instant::now())),
+            status_msg: Some(("Logitech G510 Control Deck Initialized".to_string(), Instant::now())),
         };
 
         app.refresh_status();
@@ -705,7 +705,7 @@ fn ui(f: &mut Frame, app: &App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Logitech G510 / G510s Interactive Control Suite ")
+                .title(" Logitech G510 Control Deck ")
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(Color::Cyan)),
         )

@@ -1,6 +1,6 @@
-# Logitech G510 & G510s Linux Control Suite ⌨️📺
+# Logitech G510 Control Deck ⌨️📺
 
-> **A fast, lightweight, and modern Linux driver & desktop control suite for the Logitech G510 and G510s gaming keyboards.**  
+> **A fast, lightweight, and modern Linux driver & desktop control deck for the Logitech G510 and G510s gaming keyboards.**  
 > Built from scratch in native Rust. Gives you a working GamePanel LCD, custom RGB lighting, 54 macro shortcuts, and an interactive control center — without frozen typing or bloated background processes.
 
 [![Release](https://img.shields.io/github/v/release/SWORDIntel/G510s-Drive?color=red&label=release)](https://github.com/SWORDIntel/G510s-Drive/releases)
@@ -32,7 +32,7 @@ If you've ever tried using a Logitech G510 or G510s on modern Linux, you've prob
 | 🎨 **Full RGB Backlighting** | Set any color or brightness, switch between profiles, or trigger pulsing / flashing reactive alert animations. |
 | ⌨️ **54 Dedicated Macro Slots** | 18 physical G-keys across 3 profiles (M1, M2, M3). Map terminal commands, keystrokes (Copy, Paste, Undo), or app launchers. |
 | 🔴 **On-The-Fly Macro Recording** | Hit the physical **MR** key, tap a G-key, type your shortcut, and hit **MR** again to save. |
-| 🎛️ **Interactive Control Center** | A full-featured terminal dashboard (`g510tui`) to tune lighting, macros, and screens in real-time. |
+| 🎛️ **Interactive Control Center** | A full-featured terminal dashboard (`g510deck` or `g510tui`) to tune lighting, macros, and screens in real-time. |
 | 🔊 **Audio & Mic Mute Sync** | Physical mute buttons automatically sync with PipeWire / PulseAudio and show status toasts on the LCD. |
 | 🔌 **Custom Screen API** | Push your own custom dashboards or stats from Python, Bash, Node, or Go in 3 lines of code. |
 
@@ -46,7 +46,7 @@ Download the latest `.deb` directly from the [GitHub Releases page](https://gith
 
 ```bash
 # Download and install the prebuilt package
-sudo apt install ./g510s-drive_0.2.0_amd64.deb
+sudo apt install ./g510-deck_0.2.0_amd64.deb
 ```
 
 That's it! The installer automatically sets up udev permissions, enables the background service, and adds the app to your Start Menu.
@@ -70,16 +70,17 @@ The installer handles cargo release compilation, installs the binaries to `/usr/
 
 ## How to use it
 
-### 1. Launch the Control Center (TUI)
+### 1. Launch the Control Deck (TUI)
 
-Launch **Logitech G510s Control Suite** directly from your desktop **Start Menu / Application Finder** under **Settings → Hardware**, or run from any terminal:
+Launch **Logitech G510 Control Deck** directly from your desktop **Start Menu / Application Finder** under **Settings → Hardware**, or run from any terminal:
 
 ```bash
-g510tui
+g510deck
+# or: g510tui, g510ctl deck
 ```
 
 ```text
-┌── Logitech G510s Control Suite ─────────────────────────────────────────────────────────────┐
+┌── Logitech G510 Control Deck ──────────────────────────────────────────────────────────────┐
 │ [1: Lighting & RGB]   [2: Macro Keys]   [3: LCD Screens]   [4: Audio & Hardware]          │
 ├─────────────────────────────────────────────────────────────────────────────────────────────┤
 │  Color Palette:                                Brightness: [====================] 100%      │

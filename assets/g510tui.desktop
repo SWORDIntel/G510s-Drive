@@ -1,12 +1,12 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Logitech G510s Control Suite
-GenericName=Keyboard Hardware & LCD Controller
-Comment=Interactive TUI for RGB lighting, macros, and GamePanel LCD
-Exec=g510tui
-Icon=g510tui
+Name=Logitech G510 Control Deck
+GenericName=G510 Hardware & GamePanel Control Deck
+Comment=Interactive control deck for Logitech G510/G510s (RGB, Macros, LCD)
+Exec=g510deck
+Icon=g510deck
 Terminal=true
 Categories=Settings;HardwareSettings;
-Keywords=logitech;g510;g510s;keyboard;rgb;macro;lcd;gamepanel;
+Keywords=logitech;g510;g510s;keyboard;rgb;macro;lcd;gamepanel;deck;
 StartupNotify=false

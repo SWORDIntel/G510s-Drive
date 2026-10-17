@@ -52,10 +52,12 @@ def main():
         hicolor_dir = icons_dir / "hicolor" / f"{sz}x{sz}" / "apps"
         hicolor_dir.mkdir(parents=True, exist_ok=True)
         resized = img.resize((sz, sz), Image.Resampling.LANCZOS)
+        resized.save(hicolor_dir / "g510deck.png", "PNG")
         resized.save(hicolor_dir / "g510tui.png", "PNG")
         resized.save(hicolor_dir / "g510s.png", "PNG")
 
     # Pixmap fallbacks
+    img.resize((256, 256), Image.Resampling.LANCZOS).save(icons_dir / "g510deck.png", "PNG")
     img.resize((256, 256), Image.Resampling.LANCZOS).save(icons_dir / "g510tui.png", "PNG")
     img.resize((256, 256), Image.Resampling.LANCZOS).save(icons_dir / "g510s.png", "PNG")
 
@@ -82,9 +84,11 @@ def generate_with_imagemagick(src_path: Path, repo_root: Path):
     for sz in sizes:
         hicolor_dir = icons_dir / "hicolor" / f"{sz}x{sz}" / "apps"
         hicolor_dir.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["convert", str(src_path), "-resize", f"{sz}x{sz}", str(hicolor_dir / "g510deck.png")], check=True)
         subprocess.run(["convert", str(src_path), "-resize", f"{sz}x{sz}", str(hicolor_dir / "g510tui.png")], check=True)
         subprocess.run(["convert", str(src_path), "-resize", f"{sz}x{sz}", str(hicolor_dir / "g510s.png")], check=True)
 
+    subprocess.run(["convert", str(src_path), "-resize", "256x256", str(icons_dir / "g510deck.png")], check=True)
     subprocess.run(["convert", str(src_path), "-resize", "256x256", str(icons_dir / "g510tui.png")], check=True)
     subprocess.run(["convert", str(src_path), "-resize", "256x256", str(icons_dir / "g510s.png")], check=True)
     subprocess.run(["convert", str(src_path), "-resize", "16x16", str(icons_dir / "favicon-16x16.png")], check=True)

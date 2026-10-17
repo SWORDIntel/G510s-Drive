@@ -154,22 +154,24 @@ if [[ "$DO_UNINSTALL" -eq 1 ]]; then
 
     # Remove binaries
     echo "[-] Removing binaries from $PREFIX/bin..."
-    rm -f "$PREFIX/bin/g510d" "$PREFIX/bin/g510ctl" "$PREFIX/bin/g510tui"
+    rm -f "$PREFIX/bin/g510d" "$PREFIX/bin/g510ctl" "$PREFIX/bin/g510tui" "$PREFIX/bin/g510deck"
 
     # Remove desktop entry
     echo "[-] Removing desktop entries..."
-    rm -f "$DATADIR/applications/g510tui.desktop"
-    rm -f "$TARGET_HOME/.local/share/applications/g510tui.desktop"
+    rm -f "$DATADIR/applications/g510deck.desktop" "$DATADIR/applications/g510tui.desktop"
+    rm -f "$TARGET_HOME/.local/share/applications/g510deck.desktop" "$TARGET_HOME/.local/share/applications/g510tui.desktop"
 
     # Remove icons
     echo "[-] Removing icons..."
     for sz in 16 24 32 48 64 128 256 512; do
+        rm -f "$DATADIR/icons/hicolor/${sz}x${sz}/apps/g510deck.png"
         rm -f "$DATADIR/icons/hicolor/${sz}x${sz}/apps/g510tui.png"
         rm -f "$DATADIR/icons/hicolor/${sz}x${sz}/apps/g510s.png"
+        rm -f "$TARGET_HOME/.local/share/icons/hicolor/${sz}x${sz}/apps/g510deck.png"
         rm -f "$TARGET_HOME/.local/share/icons/hicolor/${sz}x${sz}/apps/g510tui.png"
         rm -f "$TARGET_HOME/.local/share/icons/hicolor/${sz}x${sz}/apps/g510s.png"
     done
-    rm -f "$DATADIR/pixmaps/g510tui.png" "$DATADIR/pixmaps/g510s.png"
+    rm -f "$DATADIR/pixmaps/g510deck.png" "$DATADIR/pixmaps/g510tui.png" "$DATADIR/pixmaps/g510s.png"
     rm -rf "$PREFIX/share/g510" "$DATADIR/g510"
 
     # Update caches
@@ -242,7 +244,7 @@ else
 fi
 
 # Verify binaries exist
-for bin in g510d g510ctl g510tui; do
+for bin in g510d g510ctl g510tui g510deck; do
     if [[ ! -f "$SCRIPT_DIR/target/release/$bin" ]]; then
         echo "[-] Error: Missing required binary: $SCRIPT_DIR/target/release/$bin" >&2
         exit 1
@@ -255,29 +257,34 @@ install -d "$PREFIX/bin"
 install -m 0755 "$SCRIPT_DIR/target/release/g510d" "$PREFIX/bin/g510d"
 install -m 0755 "$SCRIPT_DIR/target/release/g510ctl" "$PREFIX/bin/g510ctl"
 install -m 0755 "$SCRIPT_DIR/target/release/g510tui" "$PREFIX/bin/g510tui"
+install -m 0755 "$SCRIPT_DIR/target/release/g510deck" "$PREFIX/bin/g510deck"
 
 # 4. Install desktop entry, icons, and favicon
 echo "[4/6] Installing XDG start menu entry and icon assets..."
 install -d "$DATADIR/applications"
+install -m 0644 "$SCRIPT_DIR/assets/g510deck.desktop" "$DATADIR/applications/g510deck.desktop"
 install -m 0644 "$SCRIPT_DIR/assets/g510tui.desktop" "$DATADIR/applications/g510tui.desktop"
 
 # Also install to user local applications if available
 if [[ -d "$TARGET_HOME/.local/share" ]]; then
     install -d "$TARGET_HOME/.local/share/applications"
+    install -m 0644 "$SCRIPT_DIR/assets/g510deck.desktop" "$TARGET_HOME/.local/share/applications/g510deck.desktop"
     install -m 0644 "$SCRIPT_DIR/assets/g510tui.desktop" "$TARGET_HOME/.local/share/applications/g510tui.desktop"
-    chown -R "$TARGET_USER:" "$TARGET_HOME/.local/share/applications/g510tui.desktop" 2>/dev/null || true
+    chown -R "$TARGET_USER:" "$TARGET_HOME/.local/share/applications" 2>/dev/null || true
 fi
 
 # Install hicolor icons
 for sz in 16 24 32 48 64 128 256 512; do
-    icon_src="$SCRIPT_DIR/assets/icons/hicolor/${sz}x${sz}/apps/g510tui.png"
+    icon_src="$SCRIPT_DIR/assets/icons/hicolor/${sz}x${sz}/apps/g510deck.png"
     if [[ -f "$icon_src" ]]; then
         install -d "$DATADIR/icons/hicolor/${sz}x${sz}/apps"
+        install -m 0644 "$icon_src" "$DATADIR/icons/hicolor/${sz}x${sz}/apps/g510deck.png"
         install -m 0644 "$icon_src" "$DATADIR/icons/hicolor/${sz}x${sz}/apps/g510tui.png"
         install -m 0644 "$icon_src" "$DATADIR/icons/hicolor/${sz}x${sz}/apps/g510s.png"
         
         if [[ -d "$TARGET_HOME/.local/share" ]]; then
             install -d "$TARGET_HOME/.local/share/icons/hicolor/${sz}x${sz}/apps"
+            install -m 0644 "$icon_src" "$TARGET_HOME/.local/share/icons/hicolor/${sz}x${sz}/apps/g510deck.png"
             install -m 0644 "$icon_src" "$TARGET_HOME/.local/share/icons/hicolor/${sz}x${sz}/apps/g510tui.png"
             install -m 0644 "$icon_src" "$TARGET_HOME/.local/share/icons/hicolor/${sz}x${sz}/apps/g510s.png"
             chown -R "$TARGET_USER:" "$TARGET_HOME/.local/share/icons" 2>/dev/null || true
@@ -287,7 +294,8 @@ done
 
 # Install pixmaps fallback
 install -d "$DATADIR/pixmaps"
-if [[ -f "$SCRIPT_DIR/assets/icons/g510tui.png" ]]; then
+if [[ -f "$SCRIPT_DIR/assets/icons/g510deck.png" ]]; then
+    install -m 0644 "$SCRIPT_DIR/assets/icons/g510deck.png" "$DATADIR/pixmaps/g510deck.png"
     install -m 0644 "$SCRIPT_DIR/assets/icons/g510tui.png" "$DATADIR/pixmaps/g510tui.png"
     install -m 0644 "$SCRIPT_DIR/assets/icons/g510s.png" "$DATADIR/pixmaps/g510s.png"
 fi

@@ -30,6 +30,10 @@ path = "src/bin/g510d.rs"
 name = "g510tui"
 path = "src/bin/g510tui.rs"
 
+[[bin]]
+name = "g510deck"
+path = "src/bin/g510deck.rs"
+
 [lib]
 name = "g510"
 path = "src/lib.rs"
