@@ -105,3 +105,17 @@ A modern Linux hardware control suite for the Logitech G510 and G510s Gaming Key
   - Daemon health status (PID, socket path, version).
   - Device nodes verification (`/dev/g510-lcd`, `/dev/input/event*`).
 
+---
+
+## Phase 7: Packaging, Desktop Integration & System Installer
+- [x] **Bundled Source Logo Asset**: Copied `/home/john/Pictures/G410S.png` into repository assets (`assets/G410S.png` and `assets/icons/g510s.png`).
+- [x] **Multi-Resolution Icon Generation**: Built `tools/generate-icons.py` generating full XDG hicolor icon suites (16×16, 24×24, 32×32, 48×48, 64×64, 128×128, 256×256, 512×512 PNGs) and multi-frame `favicon.ico` (16, 32, 48, 64).
+- [x] **Start Menu Desktop Entry**: Authored and validated `assets/g510tui.desktop` (`Logitech G510s Control Suite`) registered under Settings/HardwareSettings with `Terminal=true` to launch the interactive TUI directly from KDE Plasma Kickoff / GNOME / XFCE menus.
+- [x] **All-in-One Automated Installer (`install.sh`)**:
+  - Full system installation with automatic root/sudo elevation and user-space mode (`--user`).
+  - Cargo release compilation preserving active user PATH and cache ownership.
+  - Deployment of binaries to `/usr/local/bin/` (`g510d`, `g510ctl`, `g510tui`).
+  - Deployment of udev rules and systemd service `g510-status.service` with automatic user detection and enablement.
+  - XDG desktop and icon database cache synchronization (`update-desktop-database`, `gtk-update-icon-cache`, `kbuildsycoca6`).
+  - Full clean uninstall routine (`./install.sh --uninstall`) leaving zero residue.
+

@@ -1,0 +1,13 @@
+# Logitech G510 / G510s Gaming Keyboard (046d:c22d, 046d:c22e)
+
+# Grant user session access to G510 LCD hidraw device on Interface 1
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c22[de]", DEVPATH=="*1.1/*", SYMLINK+="g510-lcd", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+
+# Grant user session access to G510 input devices
+SUBSYSTEM=="input", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c22[de]", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+
+# Grant access to uinput for macro injection
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+
+# Grant access to G510 LED attributes for brightness and RGB multi_intensity
+SUBSYSTEM=="leds", KERNEL=="g15*", RUN+="/bin/sh -c 'chgrp plugdev /sys%p/brightness /sys%p/multi_intensity 2>/dev/null || true; chmod g+w /sys%p/brightness /sys%p/multi_intensity 2>/dev/null || true'"

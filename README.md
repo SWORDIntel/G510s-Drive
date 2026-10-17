@@ -16,20 +16,40 @@ A native Linux hardware control suite, interactive multi-page LCD ecosystem, 54-
 
 ## 2. Quick Start & Installation
 
-### 2.1 Install Build Dependencies & Compile
+### 2.1 Automated One-Command Installation (Recommended)
+
+The repository provides an all-in-one automated installer (`install.sh`) that compiles release binaries, configures udev non-root seat permissions, installs and starts the systemd service, deploys multi-resolution desktop icons (16×16 to 512×512 + `favicon.ico`), registers the XDG Start Menu launcher (`Logitech G510s Control Suite`), and refreshes KDE Plasma / GTK application caches:
+
+```bash
+# Clone the repository (if not already local)
+git clone https://github.com/SWORDIntel/G510s-Drive.git
+cd G510s-Drive
+
+# Run full system installation (prompts for sudo if non-root)
+./install.sh
+```
+
+#### Installer Features & Options
+- `sudo ./install.sh`: Full system install to `/usr/local/bin`, `/etc/udev/rules.d`, and `/etc/systemd/system`.
+- `./install.sh --user`: User-space install to `~/.local/bin` and `~/.local/share/applications` without sudo.
+- `./install.sh --no-build`: Fast deployment reusing existing release binaries.
+- `sudo ./install.sh --uninstall`: Clean uninstallation of binaries, desktop files, icons, udev rules, and systemd units.
+
+#### Desktop & Start Menu Integration
+- **Start Menu**: Launchable directly from your application launcher (KDE Kickoff, GNOME, XFCE) under **Settings → Hardware** as `Logitech G510s Control Suite`.
+- **Terminal Launch**: Or launch anytime via `g510tui` or `g510ctl tui`.
+- **Favicon & Assets**: Multi-frame `favicon.ico` (16, 32, 48, 64) and high-res logos installed to `/usr/local/share/g510/` and `/usr/share/icons/hicolor/`.
+
+### 2.2 Manual Compilation & Testing (Developer Workflow)
 
 ```bash
 # Debian / Ubuntu dependencies
 sudo apt update && sudo apt install -y build-essential pkg-config libudev-dev
 
-# Build release binaries (g510ctl and g510d)
+# Build release binaries (g510ctl, g510d, g510tui)
 cargo build --release
 
-# Install binaries to system path
-sudo install -m 755 target/release/g510d /usr/local/bin/g510d
-sudo install -m 755 target/release/g510ctl /usr/local/bin/g510ctl
-
-# Run unit tests
+# Run 23 unit tests
 cargo test --release
 ```
 
