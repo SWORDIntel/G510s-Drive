@@ -322,7 +322,54 @@ Executable reference plugins are included in the repository under [`examples/plu
 
 ---
 
-## 7. Command-Line Reference Summary (`g510ctl`)
+## 7. Interactive Terminal User Interface (TUI)
+
+An interactive full-screen terminal control interface built with `ratatui` and `crossterm` is available via `g510tui` or `g510ctl tui`:
+
+```bash
+# Launch interactive TUI
+g510tui
+# or
+g510ctl tui
+```
+
+### TUI Features & Keybindings
+
+- **Tab Navigation**:
+  - `Tab` / `Shift-Tab` or `1` / `2` / `3` / `4` (or `F1`–`F4`): Switch between tabs.
+- **Tab 1: Lighting & RGB**:
+  - `Up` / `Down` (`k` / `j`): Select from curated color swatches (Dev Green, Security Red, Media Blue, Amber, Cyan, Purple, Yellow, White, Off).
+  - `Left` / `Right` (`h` / `l` or `-` / `+`): Adjust brightness smoothly (0–255) with visual gauge bar.
+  - `Enter` / `Space`: Apply selected color and brightness directly to hardware.
+  - `t`: Toggle target mode between live active RGB and USB power-on reset default.
+  - `f`: Test hardware flash alert (flashes 3x in selected color).
+  - `b`: Test hardware breathing pulse (smooth sinusoidal 3.0s wave).
+- **Tab 2: Macro Controls**:
+  - `m` / `Left` / `Right`: Switch active profile (M1 Dev, M2 SecLab, M3 Media).
+  - `Up` / `Down` (`k` / `j`): Select target G-key (G1 to G18).
+  - `Enter` / `a`: Open interactive Action Preset Picker modal (assign Terminal, Git, Cargo, Chords, Media, LCD jumps).
+  - `d` / `Delete`: Clear / Unassign macro for selected key.
+  - `s`: Save macro configuration to `~/.config/g510s-drive/config.json`.
+  - `r`: Reload configuration from disk.
+  - `c`: Set profile theme RGB to active lighting color.
+- **Tab 3: LCD & IPC Applets**:
+  - `Up` / `Down`: Select from built-in carousel pages (SYS, NET, SEC, MEDIA, AGENT).
+  - `Enter`: Jump physical LCD directly to selected page over IPC.
+  - `t`: Send test modal toast notification to LCD screen.
+  - `p`: Ping daemon IPC socket to test latency.
+  - View list of external dynamic plugins currently registered over IPC.
+- **Tab 4: Audio & Status Diagnostics**:
+  - `m`: Toggle microphone mute via PipeWire / PulseAudio.
+  - `a`: Toggle audio sink mute.
+  - View real-time daemon status (`g510d` online/offline, socket path, version).
+  - View hardware transport nodes (`/dev/g510-lcd`, `/dev/input/event*`, sysfs paths).
+  - `r`: Refresh diagnostics.
+- **Global**:
+  - `q` / `Esc`: Exit TUI cleanly (restores terminal raw mode and alternate screen).
+
+---
+
+## 8. Command-Line Reference Summary (`g510ctl`)
 
 ```text
 g510ctl [COMMAND]
@@ -338,6 +385,7 @@ Commands:
   alert [MODE]          Trigger reactive RGB alert animation (--color, --times, --duration)
   mute <TARGET>         Query or toggle microphone/audio mute state (--toggle)
   plugin <ACTION>       Manage dynamic LCD applet plugins over IPC (ping, register, update, unregister, list)
+  tui                   Launch interactive Terminal User Interface (TUI)
   listen                Listen for and print G-keys, M-keys, and LCD buttons (--json)
   run                   Run foreground macro execution engine
   init-config           Initialize default macro configuration file
@@ -345,9 +393,9 @@ Commands:
 
 ---
 
-## 8. Verification & Test Suite
+## 9. Verification & Test Suite
 
-All 19 unit tests pass in release mode:
+All 23 unit tests pass in release mode:
 ```bash
 cargo test --release
 ```
@@ -356,6 +404,8 @@ Test coverage includes:
 - Zero-allocation 992-byte Output Report 3 frame packing and pixel coordinate mapping.
 - Embedded graphics rasterization across all 5 built-in screens and dynamic plugin screens.
 - Full IPC request/response serialization, page registration, and lifecycle state management.
+- Terminal User Interface (TUI) state machines, preset validations, and profile cycling.
 - Linux evdev gaming keycode parsing and macro config loading.
 - Sysfs RGB multi-intensity hex string parsing and LED attribute manipulation.
 - Live telemetry CPU counters, memory calculations, and time string formatting.
+

@@ -112,6 +112,8 @@ enum Commands {
         #[command(subcommand)]
         action: PluginAction,
     },
+    /// Launch interactive Terminal User Interface (TUI) for keyboard lighting, macros, and LCD controls
+    Tui,
 }
 
 #[derive(Subcommand, Debug)]
@@ -477,6 +479,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         },
+        Commands::Tui => {
+            g510::tui::run()?;
+        }
     }
 
     Ok(())

@@ -79,3 +79,29 @@ A modern Linux hardware control suite for the Logitech G510 and G510s Gaming Key
   - Complete API specification and LCD layout guide in `docs/PLUGINS.md`.
   - Reference Python disk monitoring daemon in `examples/plugins/disk_monitor.py`.
   - Reference Shell/Bash live clock & uptime ticker in `examples/plugins/clock_ticker.sh`.
+
+---
+
+## Phase 6: Interactive Terminal User Interface (TUI)
+- [x] **Terminal UI Architecture (`ratatui` + `crossterm`)**:
+  - Embedded into `g510ctl tui` and standalone binary `g510tui`.
+  - Non-blocking event loop with clean alternate screen and raw mode lifecycle management.
+- [x] **Lighting & RGB Configuration Tab**:
+  - Live color presets (Dev Green, Security Red, Media Blue, Amber, Cyan, Purple, Yellow, White, Off).
+  - Real-time brightness slider with visual gauge bar (0–255).
+  - Target mode selection (Live sysfs vs. USB Power-on reset).
+  - Reactive alert test buttons (Flash 3x, Breathing Pulse).
+- [x] **Macro Orchestration Tab**:
+  - Profile switcher (M1 Dev, M2 SecLab, M3 Media).
+  - Full G1–G18 macro assignment viewer.
+  - Interactive Action Preset Picker modal dialog (Terminal, Git, Cargo, Chords, Media, LCD, Unassign).
+  - Profile theme RGB color assignment and direct config save/reload (`~/.config/g510s-drive/config.json`).
+- [x] **LCD & IPC Applets Tab**:
+  - Built-in carousel page switcher (SYS, NET, SEC, MEDIA, AGENT).
+  - Dynamic IPC plugins inspector.
+  - Instant LCD toast dispatch and IPC ping probe.
+- [x] **Audio & Hardware Diagnostics Tab**:
+  - PipeWire / PulseAudio microphone and speaker mute status and toggles.
+  - Daemon health status (PID, socket path, version).
+  - Device nodes verification (`/dev/g510-lcd`, `/dev/input/event*`).
+

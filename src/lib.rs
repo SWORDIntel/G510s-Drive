@@ -9,6 +9,7 @@ pub mod plugins;
 pub mod render;
 pub mod telemetry;
 pub mod transport;
+pub mod tui;
 
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
