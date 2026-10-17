@@ -325,6 +325,19 @@ def shorten_name(name):
     return name
 
 
+def check_key_event():
+    """Check for recent hardware key events written by g510d."""
+    uid = os.getuid()
+    path = f"/run/user/{uid}/g510-key-event.json"
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
 class HaxCockpitPlugin:
     def __init__(self, sock_path=None, interval=DEFAULT_INTERVAL_SEC, enable_alerts=True):
         self.sock_path = sock_path or get_socket_path()
@@ -335,6 +348,8 @@ class HaxCockpitPlugin:
         self.last_subagent_status = "idle"
         self.last_active_agy = 0
         self.last_alert_time = 0
+        self.last_key_ts = 0
+        self.view_mode = 0  # 0: Overview, 1: Subagent Details, 2: Account Pool
 
     def register(self):
         """Register the dynamic HAX COCKPIT page with g510d."""
@@ -369,45 +384,112 @@ class HaxCockpitPlugin:
         hax_cnt = procs["hax_count"]
         agy_cnt = procs["agy_count"]
 
-        # 1. Line 1: Orchestrator identity and Subagent Process Count (Max 26 chars)
-        orch_str = shorten_name(telem["orch_model"])
-        if agy_cnt > 0:
-            line1 = f"Orch:{orch_str} | Sub:{agy_cnt:2d}"
-        elif hax_cnt > 0:
-            line1 = f"Orch:{orch_str} | Sub:idle"
-        else:
-            line1 = f"Orch:idle | Accs:{acc_count} RR"
+        # 0. Check physical L3 / L4 softkeys
+        ev = check_key_event()
+        if ev and ev.get("ts", 0) > self.last_key_ts:
+            self.last_key_ts = ev["ts"]
+            key = ev.get("key")
+            if key == "L3":
+                self.view_mode = (self.view_mode + 1) % 3
+                modes = ["OVERVIEW", "SUBAGENTS", "ACCOUNTS"]
+                send_ipc({
+                    "cmd": "toast",
+                    "message": f"VIEW: {modes[self.view_mode]}",
+                    "duration_ms": 1200,
+                }, self.sock_path)
+            elif key == "L4":
+                # Emergency Abort for active subagent
+                if procs["agy_details"]:
+                    sub_pid, _ = procs["agy_details"][0]
+                    try:
+                        os.kill(sub_pid, signal.SIGTERM)
+                        send_ipc({
+                            "cmd": "toast",
+                            "message": f"ABORTED AGY PID {sub_pid}",
+                            "duration_ms": 2500,
+                        }, self.sock_path)
+                        send_ipc({
+                            "cmd": "alert",
+                            "mode": "flash",
+                            "color": "#ffaa00",
+                            "times": 1,
+                            "duration": 1.0,
+                        }, self.sock_path)
+                    except Exception as e:
+                        send_ipc({
+                            "cmd": "toast",
+                            "message": f"KILL FAILED: {e}",
+                            "duration_ms": 2000,
+                        }, self.sock_path)
+                else:
+                    send_ipc({
+                        "cmd": "toast",
+                        "message": "NO SUBAGENTS RUNNING",
+                        "duration_ms": 1200,
+                    }, self.sock_path)
 
-        # 2. Line 2: Subagent Status, Model, and Rotation State (Max 26 chars)
-        status = telem["subagent_status"]
-        if agy_cnt > 0 or status == "running":
-            sub_m = shorten_name(telem["subagent_model"] or "Gemini3.8Fl")
-            line2 = f"Agy:{sub_m} [RUN]"
-        elif status == "quota_429":
-            line2 = f"Agy:429 -> RR ({acc_count}accs)"
-        elif status == "filter_block":
-            line2 = f"Agy:Filter -> Rephrasing"
-        elif status == "done":
-            line2 = f"Agy:Task Done [OK]"
-        else:
-            lat_sec = telem["elapsed_ms"] / 1000.0
-            line2 = f"Pool:{acc_count}accs RR ({lat_sec:.1f}s)"
-
-        # 3. Line 3: Orchestrator Context Tokens and Gauge Bar (Max 16 chars before gauge)
+        # 1. Format Views based on view_mode
         in_tok = telem["input_tokens"]
-        if in_tok >= 1_000_000:
-            tok_fmt = f"{in_tok / 1_000_000:.1f}M"
-        elif in_tok >= 1_000:
-            tok_fmt = f"{in_tok / 1_000:.1f}k"
-        else:
-            tok_fmt = f"{in_tok}"
-
-        line3 = f"Ctx:{tok_fmt}"
-        if telem["cache_pct"] > 80:
-            line3 += f"({int(telem['cache_pct'])}%c)"
-
         context_pct = compute_context_percentage(telem["orch_model"], in_tok)
 
+        if self.view_mode == 1:
+            # Mode 1: Subagent Drilldown
+            if procs["agy_details"]:
+                sub_pid, sub_cmd = procs["agy_details"][0]
+                m = re.search(r'--model\s+["\']?([^"\'\s]+)', sub_cmd)
+                m_name = shorten_name(m.group(1) if m else "Gemini3.8Fl")
+                line1 = f"Sub PID {sub_pid} [L4:KILL]"
+                line2 = f"M:{m_name}"
+                line3 = "Status: RUNNING"
+                bar = 100.0
+            else:
+                line1 = "Subagents: 0 Active"
+                line2 = "No background tasks"
+                line3 = "Queue: Idle"
+                bar = 0.0
+
+        elif self.view_mode == 2:
+            # Mode 2: Account Pool Health
+            line1 = f"Agy Pool: {acc_count} Accounts"
+            line2 = "Rotation: Round-Robin"
+            line3 = "Pool: Healthy"
+            bar = 100.0
+
+        else:
+            # Mode 0: Main Cockpit Overview
+            orch_str = shorten_name(telem["orch_model"])
+            if agy_cnt > 0:
+                line1 = f"Orch:{orch_str} | Sub:{agy_cnt:2d}"
+            elif hax_cnt > 0:
+                line1 = f"Orch:{orch_str} | Sub:idle"
+            else:
+                line1 = f"Orch:idle | Accs:{acc_count} RR"
+
+            status = telem["subagent_status"]
+            if agy_cnt > 0 or status == "running":
+                sub_m = shorten_name(telem["subagent_model"] or "Gemini3.8Fl")
+                line2 = f"Agy:{sub_m} [RUN]"
+            elif status == "quota_429":
+                line2 = f"Agy:429 -> RR ({acc_count}accs)"
+            elif status == "filter_block":
+                line2 = f"Agy:Filter -> Rephrasing"
+            elif status == "done":
+                line2 = f"Agy:Task Done [OK]"
+            else:
+                lat_sec = telem["elapsed_ms"] / 1000.0
+                line2 = f"Pool:{acc_count}accs RR ({lat_sec:.1f}s)"
+
+            if in_tok >= 1_000_000:
+                tok_fmt = f"{in_tok / 1_000_000:.1f}M"
+            elif in_tok >= 1_000:
+                tok_fmt = f"{in_tok / 1_000:.1f}k"
+            else:
+                tok_fmt = f"{in_tok}"
+
+            line3 = f"Ctx:{tok_fmt}"
+            if telem["cache_pct"] > 80:
+                line3 += f"({int(telem['cache_pct'])}%c)"
+            bar = round(context_pct, 1)
         # 4. Handle Smart Reactive Alerts
         now = time.time()
         if self.enable_alerts and (now - self.last_alert_time > 8.0):

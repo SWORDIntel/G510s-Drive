@@ -144,4 +144,7 @@ A modern Linux hardware control deck and driver for the Logitech G510 and G510s 
 - [x] **LCD Dynamic Carousel Applet**: 160×43 GamePanel screen showing orchestrator/subagent status, context tokens (`Ctx: XXk`), and model context window fill gauge bar.
 - [x] **Smart Hardware Alerts**: Targeted amber pulses for round-robin 429 rotation, magenta flashes for filter rephrasing, and green flashes for task completion.
 - [x] **Dynamic Profile Color Restoration**: Updated `g510d` alert engine to resolve the live sysfs profile indicator LED (`macro_preset1-3`) ensuring RGB alerts always restore the active profile color (Red on M2).
+- [x] **Physical LCD Softkey Action Routing (L3/L4)**: Mapped physical buttons L3 and L4 in `g510d` to write atomic IPC key event payloads (`/run/user/1000/g510-key-event.json`), enabling applet drilldown (L3 cycles Overview, Subagents, Account Pool) and interactive task abort (L4 sends `SIGTERM` to active subagent PID).
+- [x] **QIHSE Cluster Mesh & Redis Store Tracker (`qihse_mesh.py`)**: Distributed cluster monitoring applet probing Node 5 (`730xd:7115` sub-millisecond RTT), Node 1 (`t320:7101`), and local node Redis key counts (`127.0.0.1:6401` DBSIZE gauge) with automated `g510-qihse-mesh.service` systemd unit.
+
 

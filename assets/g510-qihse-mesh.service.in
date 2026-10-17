@@ -1,0 +1,13 @@
+[Unit]
+Description=Logitech G510 QIHSE Cluster Mesh & Anti-Entropy Sync Tracker Plugin
+After=g510-status.service
+PartOf=g510-status.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 @@REPO_ROOT@@/examples/plugins/qihse_mesh.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

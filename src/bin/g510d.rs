@@ -209,6 +209,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         }
                                         eprintln!("[g510d] Page -> {}", name);
                                     }
+                                    G510Key::LcdMenu(3) => {
+                                        // L3: Action Key 1 (Subagent Drilldown / Cycle)
+                                        let cur_page = page_keys.load(Ordering::SeqCst);
+                                        let uid = unsafe { libc::getuid() };
+                                        let event_path = format!("/run/user/{uid}/g510-key-event.json");
+                                        let payload = format!("{{\"key\":\"L3\",\"page\":{},\"ts\":{}}}\n", cur_page + 1, unsafe { libc::time(std::ptr::null_mut()) });
+                                        let _ = fs::write(&event_path, payload);
+                                        eprintln!("[g510d] L3 pressed (Page {})", cur_page + 1);
+                                    }
+                                    G510Key::LcdMenu(4) => {
+                                        // L4: Action Key 2 (Task Action / Abort)
+                                        let cur_page = page_keys.load(Ordering::SeqCst);
+                                        let uid = unsafe { libc::getuid() };
+                                        let event_path = format!("/run/user/{uid}/g510-key-event.json");
+                                        let payload = format!("{{\"key\":\"L4\",\"page\":{},\"ts\":{}}}\n", cur_page + 1, unsafe { libc::time(std::ptr::null_mut()) });
+                                        let _ = fs::write(&event_path, payload);
+                                        eprintln!("[g510d] L4 pressed (Page {})", cur_page + 1);
+                                    }
                                     G510Key::LcdMenu(5) => {
                                         // L5: Home (System)
                                         let dyn_count = dyn_pages_keys.lock().map_or(0, |p| p.len());
