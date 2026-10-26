@@ -6,7 +6,7 @@ Monitors the distributed local QIHSE AI memory cluster:
 - Local Node 0: t420 (192.168.1.91:7100)
 - Remote Peer Node 5: 730xd (192.168.1.90:7115) with sub-millisecond LAN RTT
 - Remote Peer Node 1: t320 (192.168.1.250:7101)
-- Local Redis / Vector Store: 127.0.0.1:6401 (DBSIZE, memory count)
+- Local AIMEM store: 127.0.0.1:6401 (service-scoped memory count)
 - Replication Health & Peer State Detection
 
 Displays real-time cluster telemetry on the Logitech G510/G510s 160x43 GamePanel
@@ -17,6 +17,8 @@ License: MIT
 """
 
 import argparse
+import importlib.util
+from pathlib import Path
 import json
 import os
 import signal
@@ -30,7 +32,8 @@ DEFAULT_INTERVAL_SEC = 2.0
 
 # Known QIHSE Cluster Configuration
 LOCAL_REDIS_PORT = 6401
-LOCAL_REDIS_PASS = "QeZSpZ9jVFUf4cMKhzzmSRBxHRXje8z-"
+_aimem_session = None
+_aimem_retry_after = 0.0
 
 PEER_730XD_HOST = "192.168.1.90"
 PEER_730XD_PORT = 7115
@@ -85,32 +88,50 @@ def probe_tcp_peer(host, port, timeout_sec=0.8):
         return False, 0.0
 
 
-def recv_redis_line(sock):
-    buf = b""
-    while not buf.endswith(b"\r\n"):
-        chunk = sock.recv(1)
-        if not chunk:
-            break
-        buf += chunk
-    return buf.decode("utf-8", errors="ignore").strip()
-
-
 def probe_local_redis():
-    """Query local QIHSE Redis store for key count and status."""
+    """Count AIMEM with a pinned service session, never operator/legacy AUTH."""
+    global _aimem_session, _aimem_retry_after
+    if time.monotonic() < _aimem_retry_after:
+        return None
+    if _aimem_session is None:
+        env_path = Path(os.environ.get("QIHSE_AIMEM_ENV", str(Path.home() / ".config/qihse-aimem/env")))
+        try:
+            stat = env_path.lstat()
+            if env_path.is_symlink() or stat.st_uid != os.geteuid() or stat.st_mode & 0o077:
+                return None
+            values = dict(line.split("=", 1) for line in env_path.read_text().splitlines()
+                          if "=" in line and not line.startswith("#"))
+            if values.get("QIHSE_AIMEM_TRANSPORT") != "qkp" or values.get("QIHSE_AUTH_USER") != "AIMEM_SERVICE":
+                return None
+            sdk = values["QIHSE_ADMIN_SDK"]
+            lib = values["QIHSE_ADMIN_LIB"]
+            if not Path(sdk).is_file() or not Path(lib).is_file():
+                return None
+            spec = importlib.util.spec_from_file_location("qihse_mesh_admin", sdk)
+            if spec is None or spec.loader is None:
+                return None
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            admin = module.ClusterAdmin(node_id=values["QIHSE_AIMEM_NODE_ID"],
+                                        identity_dir=values["QIHSE_AIMEM_IDENTITY_DIR"], lib_path=lib)
+            if not admin.is_native or admin._lib._qihse_lib_path != os.path.abspath(lib):
+                return None
+            _aimem_session = admin.session("127.0.0.1", LOCAL_REDIS_PORT,
+                                           values["QIHSE_AIMEM_TRUSTED_PUB"],
+                                           user="AIMEM_SERVICE", password=values["QIHSE_AUTH_PASSWORD"],
+                                           timeout_ms=10000)
+        except Exception:
+            # A rejected AUTH must not trigger another attempt on every LCD tick.
+            _aimem_retry_after = time.monotonic() + 300
+            return None
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(1.0)
-            s.connect(("127.0.0.1", LOCAL_REDIS_PORT))
-            if LOCAL_REDIS_PASS:
-                s.sendall(f"AUTH {LOCAL_REDIS_PASS}\r\n".encode("utf-8"))
-                recv_redis_line(s)
-            s.sendall(b"DBSIZE\r\n")
-            line = recv_redis_line(s)
-            if line.startswith(":"):
-                return int(line[1:])
+        result = _aimem_session.execute("AIMEM", "COUNT-SCOPED", "global", "", "", "")
+        return result if isinstance(result, int) else None
     except Exception:
-        pass
-    return None
+        _aimem_session.close()
+        _aimem_session = None
+        _aimem_retry_after = time.monotonic() + 300
+        return None
 
 
 class QihseMeshPlugin:
@@ -177,11 +198,11 @@ class QihseMeshPlugin:
         t320_str = f"{rtt_t320:.0f}ms" if online_t320 else "OFF"
         line2 = f"730xd:{lat_str} t320:{t320_str}"
 
-        # 6. Format Line 3: Local Memory Keys Count (Max 16 chars before gauge)
+        # 6. Format Line 3: Scoped AIMEM record count (Max 16 chars before gauge)
         if key_count is not None:
-            line3 = f"Keys:{key_count:d}"
+            line3 = f"Mem:{key_count:d}"
         else:
-            line3 = "Keys:Local"
+            line3 = "Mem:Local"
 
         # 7. Cluster Health Gauge Percentage
         if online_nodes == 3:
