@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Launch the FTXUI C++ control deck in a desktop terminal.
+set -Eeuo pipefail
+
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/$(id -u)/bus}"
+
+APP="$(command -v g510deck-cpp || true)"
+if [[ -z "$APP" || ! -x "$APP" ]]; then
+    echo "g510deck-cpp is not installed or not on PATH" >&2
+    exit 127
+fi
+
+if pgrep -u "$(id -u)" -x g510deck-cpp >/dev/null 2>&1; then
+    if command -v wmctrl >/dev/null 2>&1; then
+        wmctrl -a "G510s Deck" 2>/dev/null || true
+    fi
+    exit 0
+fi
+
+LOG="${XDG_CACHE_HOME:-$HOME/.cache}/g510deck-cpp-launch.log"
+mkdir -p "$(dirname "$LOG")"
+
+if command -v xfce4-terminal >/dev/null 2>&1; then
+    exec xfce4-terminal --title="G510s Deck" --command="$APP" >>"$LOG" 2>&1
+elif command -v konsole >/dev/null 2>&1; then
+    exec konsole --title "G510s Deck" -e "$APP" >>"$LOG" 2>&1
+elif command -v tilix >/dev/null 2>&1; then
+    exec tilix --title="G510s Deck" -e "$APP" >>"$LOG" 2>&1
+elif command -v x-terminal-emulator >/dev/null 2>&1; then
+    exec x-terminal-emulator -T "G510s Deck" -e "$APP" >>"$LOG" 2>&1
+else
+    echo "No supported terminal emulator found (xfce4-terminal, konsole, tilix, x-terminal-emulator)." >&2
+    exit 127
+fi

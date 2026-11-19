@@ -1,7 +1,7 @@
 [Unit]
 Description=Logitech G510 Keyboard & LCD Native Daemon
-After=multi-user.target systemd-udevd.service
-Wants=multi-user.target
+After=systemd-udevd.service udev.service local-fs.target
+Wants=systemd-udevd.service
 
 [Service]
 Type=simple
@@ -11,6 +11,7 @@ ExecStart=/usr/local/bin/g510d --interval 1.0
 Restart=always
 RestartSec=3
 TimeoutStopSec=3
+WatchdogSec=60s
 
 [Install]
 WantedBy=multi-user.target

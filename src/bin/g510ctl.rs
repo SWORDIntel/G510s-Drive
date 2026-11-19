@@ -112,10 +112,12 @@ enum Commands {
         #[command(subcommand)]
         action: PluginAction,
     },
-    /// Launch interactive Logitech G510 Control Deck (TUI)
+    /// Launch legacy Rust TUI (only in builds with --features legacy-tui)
+    #[cfg(feature = "legacy-tui")]
     #[command(alias = "tui")]
     Deck,
-    /// Launch interactive Terminal User Interface (alias for deck)
+    /// Launch interactive Terminal User Interface (legacy feature alias)
+    #[cfg(feature = "legacy-tui")]
     #[command(hide = true)]
     Tui,
 }
@@ -212,6 +214,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             target,
         } => {
             let state = set_rgb(&color, brightness, &target, None)?;
+            if target == "live" {
+                let _ = set_rgb(&color, brightness, "power-on", None);
+            }
+            let cfg_path = default_config_path();
+            if let Ok(mut cfg) = load_config(&cfg_path) {
+                let prof = cfg.active_profile.clone();
+                cfg.profile_rgb.insert(prof, color.clone());
+                let _ = save_config(&cfg, &cfg_path);
+            }
             println!(
                 "RGB set: {} (brightness: {}/{}) at {}",
                 state.hex, state.brightness, state.max_brightness, state.led_path
@@ -219,6 +230,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Profile { profile } => {
             set_profile(profile, None)?;
+            let prof = format!("M{profile}");
+            let cfg_path = default_config_path();
+            let mut cfg = load_config(&cfg_path).unwrap_or_default();
+            cfg.active_profile = prof.clone();
+            if let Some(color) = cfg.profile_rgb.get(&prof) {
+                let _ = set_rgb(color, 255, "live", None);
+                let _ = set_rgb(color, 255, "power-on", None);
+            }
+            let _ = save_config(&cfg, &cfg_path);
             println!("Switched to profile M{profile}");
         }
         Commands::Text {
@@ -483,6 +503,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         },
+        #[cfg(feature = "legacy-tui")]
         Commands::Deck | Commands::Tui => {
             g510::tui::run()?;
         }

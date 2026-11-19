@@ -33,12 +33,16 @@ pub fn key_from_code(code: u16) -> Option<G510Key> {
     if (0x290..=0x2a1).contains(&code) {
         return Some(G510Key::G((code - 0x290 + 1) as u8));
     }
-    // KEY_MACRO_PRESET1 = 0x2a9 (681) .. KEY_MACRO_PRESET3 = 0x2ab (683)
+    // Linux standard: KEY_MACRO_PRESET1 = 0x2b3 (691) .. KEY_MACRO_PRESET3 = 0x2b5 (693)
+    if (0x2b3..=0x2b5).contains(&code) {
+        return Some(G510Key::Profile((code - 0x2b3 + 1) as u8));
+    }
+    // Alternate / legacy preset range: 0x2a9 (681) .. 0x2ab (683)
     if (0x2a9..=0x2ab).contains(&code) {
         return Some(G510Key::Profile((code - 0x2a9 + 1) as u8));
     }
-    // KEY_MACRO_RECORD_START = 0x2a8 (680)
-    if code == 0x2a8 {
+    // Linux standard: KEY_MACRO_RECORD_START = 0x2b0 (688), legacy: 0x2a8 (680)
+    if code == 0x2b0 || code == 0x2a8 {
         return Some(G510Key::Mr);
     }
     // KEY_KBD_LCD_MENU1 = 0x2b8 (696) .. KEY_KBD_LCD_MENU5 = 0x2bc (700)
@@ -82,4 +86,64 @@ pub fn find_gaming_device() -> io::Result<(PathBuf, Device)> {
         io::ErrorKind::NotFound,
         "Logitech G510 gaming key interface not found",
     ))
+}
+
+pub fn is_g510_consumer_device(device: &Device) -> bool {
+    let input_id = device.input_id();
+    if input_id.vendor() != USB_VENDOR || !USB_PRODUCTS.contains(&input_id.product()) {
+        return false;
+    }
+    // Match the actual volume controls rather than relying on a kernel-provided
+    // interface name, which can vary across kernel/driver versions.
+    device
+        .supported_keys()
+        .is_some_and(|keys| keys.contains(KeyCode::new(114)) && keys.contains(KeyCode::new(115)))
+}
+
+pub fn find_consumer_device() -> io::Result<(PathBuf, Device)> {
+    for (path, device) in evdev::enumerate() {
+        if is_g510_consumer_device(&device) {
+            return Ok((path, device));
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        "Logitech G510 Consumer Control interface not found",
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_profile_and_macro_keys() {
+        // G-keys (0x290..=0x2a1 -> G1..G18)
+        assert_eq!(key_from_code(0x290), Some(G510Key::G(1)));
+        assert_eq!(key_from_code(0x29c), Some(G510Key::G(13)));
+        assert_eq!(key_from_code(0x2a1), Some(G510Key::G(18)));
+
+        // Profile keys M1..M3 (Linux hid-g15 standard: 0x2b3..=0x2b5)
+        assert_eq!(key_from_code(0x2b3), Some(G510Key::Profile(1)));
+        assert_eq!(key_from_code(0x2b4), Some(G510Key::Profile(2)));
+        assert_eq!(key_from_code(0x2b5), Some(G510Key::Profile(3)));
+
+        // Profile keys M1..M3 (legacy range: 0x2a9..=0x2ab)
+        assert_eq!(key_from_code(0x2a9), Some(G510Key::Profile(1)));
+        assert_eq!(key_from_code(0x2ab), Some(G510Key::Profile(3)));
+
+        // MR key (0x2b0 and 0x2a8)
+        assert_eq!(key_from_code(0x2b0), Some(G510Key::Mr));
+        assert_eq!(key_from_code(0x2a8), Some(G510Key::Mr));
+
+        // LCD Menu keys L1..L5
+        assert_eq!(key_from_code(0x2b8), Some(G510Key::LcdMenu(1)));
+        assert_eq!(key_from_code(0x2bc), Some(G510Key::LcdMenu(5)));
+
+        // Name formatting
+        assert_eq!(G510Key::Profile(1).name(), "M1");
+        assert_eq!(G510Key::Profile(2).name(), "M2");
+        assert_eq!(G510Key::Profile(3).name(), "M3");
+        assert_eq!(G510Key::G(13).name(), "G13");
+    }
 }

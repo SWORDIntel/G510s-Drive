@@ -32,7 +32,7 @@ If you've ever tried using a Logitech G510 or G510s on modern Linux, you've prob
 | 🎨 **Full RGB Backlighting** | Set any color or brightness, switch between profiles, or trigger pulsing / flashing reactive alert animations. |
 | ⌨️ **54 Dedicated Macro Slots** | 18 physical G-keys across 3 profiles (M1, M2, M3). Map terminal commands, keystrokes (Copy, Paste, Undo), or app launchers. |
 | 🔴 **On-The-Fly Macro Recording** | Hit the physical **MR** key, tap a G-key, type your shortcut, and hit **MR** again to save. |
-| 🎛️ **Interactive Control Center** | A full-featured terminal dashboard (`g510deck` or `g510tui`) to tune lighting, macros, and screens in real-time. |
+| 🎛️ **Interactive Control Center** | The C++ FTXUI deck (`g510deck-cpp`) is the primary desktop interface, backed by `g510d`. The legacy Rust TUI source is retained as an opt-in, non-default fallback (`cargo build --features legacy-tui --bin g510deck`); normal builds and packages do not compile or install it. |
 | 🔊 **Audio & Mic Mute Sync** | Physical mute buttons automatically sync with PipeWire / PulseAudio and show status toasts on the LCD. |
 | 🔌 **Custom Screen API** | Push your own custom dashboards or stats from Python, Bash, Node, or Go in 3 lines of code. |
 
@@ -72,12 +72,14 @@ The installer handles cargo release compilation, installs the binaries to `/usr/
 
 ### 1. Launch the Control Deck (TUI)
 
-Launch **Logitech G510 Control Deck** directly from your desktop **Start Menu / Application Finder** under **Settings → Hardware**, or run from any terminal:
+Launch **Logitech G510 Control Deck (C++)** from your desktop **Start Menu / Application Finder** under **Settings → Hardware**. From a terminal:
 
 ```bash
-g510deck
-# or: g510tui, g510ctl deck
+g510deck-cpp       # primary C++ / FTXUI deck
+# Optional source fallback (not built by default): cargo build --features legacy-tui --bin g510deck
 ```
+
+The C++ deck is a UI client for the shared `g510d` daemon; it has its own CMake project under `deck-cpp/` and is installed by `install.sh` and the Debian package builder. The legacy Rust TUI source can be explicitly built with the `legacy-tui` feature. In the C++ Lighting tab, **Select M1/M2/M3** saves the active profile in `~/.config/g510s-drive/config.json`; `g510d` reapplies it at startup, including the power-on color. A user-level watchdog starts the visible deck at login and relaunches it if it exits.
 
 ```text
 ┌── Logitech G510 Control Deck ──────────────────────────────────────────────────────────────┐

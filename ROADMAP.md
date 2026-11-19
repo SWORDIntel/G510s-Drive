@@ -32,7 +32,7 @@ A modern Linux hardware control deck and driver for the Logitech G510 and G510s 
 - [x] **Profile M1 (Development & Daily Driving — Green `#00dc00`)**:
   - G1–G6: Workspace and window navigation (Terminal, Konsole, Git status, cargo check, test, release).
   - G7–G12: Git automation shortcuts, terminal clear, system status toasts, and agent page jump.
-  - G13–G18: Keystroke combos via native `/dev/uinput` (Copy, Paste, Find, Save, Undo, Close Tab).
+  - G13–G18: Keystroke combos & macros (Copy, Paste, Find, G16 Unicode Lenny Face `( ͡° ͜ʖ ͡°)`, Undo, Close Tab).
 - [x] **Profile M2 (Workbench & Security Lab — Red `#dc0000`)**:
   - G1–G6: Security page jump, network page jump, diagnostic toasts, docker inspection, SSH journal.
   - G7–G12: Network audit triggers, sandbox checks, snapshot states, and terminal clipboard shortcuts.
@@ -42,6 +42,8 @@ A modern Linux hardware control deck and driver for the Logitech G510 and G510s 
   - G7–G12: Audio mute, mic toggle, screen lock shortcut (`Ctrl+Alt+L`), and communications triggers.
   - G13–G18: Multimedia presets and custom actions.
 - [x] **Enhanced MR Recording**: On-the-fly macro sequence capture with MR LED feedback and LCD toast confirmation.
+- [x] **M1–M3 & MR Evdev Keycode Alignment**: Fixed input event codes in `src/events.rs` to match Linux `hid-g15` driver standard (`0x2b3..=0x2b5` for `KEY_MACRO_PRESET1..3`, `0x2b0` for `KEY_MACRO_RECORD_START`).
+- [x] **Target Guild Extraction Rig Binding**: Bound G13 key in `~/.config/g510s-drive/config.json` to `/home/john/dce-exports/scripts/export_target_guild.sh` with interactive terminal self-spawning support.
 
 ---
 
@@ -79,6 +81,7 @@ A modern Linux hardware control deck and driver for the Logitech G510 and G510s 
   - Complete API specification and LCD layout guide in `docs/PLUGINS.md`.
   - Reference Python disk monitoring daemon in `examples/plugins/disk_monitor.py`.
   - Reference Shell/Bash live clock & uptime ticker in `examples/plugins/clock_ticker.sh`.
+- [x] **Visibility-Based Idle Throttling**: Extended dynamic plugins (`hax_cockpit.py`, `qihse_mesh.py`, `g502_deck.py`) with `is_visible()` gating. When their carousel page is off-screen, expensive `/proc` traversals, remote peer socket probes, and D-Bus calls are halted, dropping idle CPU consumption to near-zero.
 
 ---
 
@@ -156,6 +159,15 @@ A modern Linux hardware control deck and driver for the Logitech G510 and G510s 
 - [x] **Physical LCD Softkey Action Routing for Mouse (L3/L4)**: Softkey L3 cycles mouse DPI resolution stages (with instant G510 on-screen toast feedback); Softkey L4 cycles onboard hardware profiles across mouse EEPROM memory slots.
 - [x] **Multi-Applet Softkey Isolation**: Updated `hax_cockpit.py` and `g502_deck.py` with `resolve_my_page()` to prevent cross-applet softkey collisions when navigating between pages.
 - [x] **Automated Systemd User Service (`g510-g502-deck.service`)**: Packaged unit template in `assets/g510-g502-deck.service.in` and enabled live user service.
-
-
-
+- [x] **Reboot Settings & Hardware State Restoration (Keyboard RGB, Power-on Reset & G502 Flash)**:
+  - Persisted `active_profile` (M2 Red) and profile RGB mappings in `~/.config/g510s-drive/config.json`.
+  - Kept hardware `g15::power_on_backlight_val` synchronized with active profile color so keyboard powers on in red across reboots.
+  - Enabled persistent G502 EEPROM flash writes (`persist=True`) in `g502ctl` and `g502_deck.py` for both lighting zones and DPI non-volatile indicator state.
+- [x] **Dual-Layer 1-Minute Daemon & Hardware Watchdog**:
+  - Systemd native watchdog (`WatchdogSec=60s`) driven by `sd_notify("WATCHDOG=1")` heartbeat from `g510d` render loop.
+  - Independent external 1-minute systemd timer (`g510-watchdog.timer` + `g510-watchdog.service`) executing `g510-watchdog` health probes to detect and recover stalled IPC or disconnected USB nodes.
+- [x] **Consumer Control Exclusive Grab & Volume Roller Anti-Flutter Shield**:
+  - Exclusive kernel grab (`EVIOCGRAB`) on `/dev/input/event*` (Consumer Control interface).
+  - Anti-flutter filter suppressing mechanical quadrature contact chatter, rapid reversal spikes (<120ms), and rate limiting volume steps.
+  - Passthrough of media keys (Play/Pause, Prev, Next, Stop, Mute) to virtual uinput.
+  - Configurable `disable_volume_roller` kill-switch option in `config.json`.

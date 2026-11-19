@@ -45,11 +45,18 @@ impl CpuCounters {
     }
 }
 
-pub fn memory_percentage() -> io::Result<f32> {
-    memory_percentage_from_path(Path::new("/proc/meminfo"))
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct MemoryInfo {
+    pub percentage: f32,
+    pub used_gb: f32,
+    pub total_gb: f32,
 }
 
-pub fn memory_percentage_from_path(path: &Path) -> io::Result<f32> {
+pub fn memory_info() -> io::Result<MemoryInfo> {
+    memory_info_from_path(Path::new("/proc/meminfo"))
+}
+
+pub fn memory_info_from_path(path: &Path) -> io::Result<MemoryInfo> {
     let content = fs::read_to_string(path)?;
     let mut total: Option<u64> = None;
     let mut available: Option<u64> = None;
@@ -71,11 +78,27 @@ pub fn memory_percentage_from_path(path: &Path) -> io::Result<f32> {
     let avail = available.unwrap_or(0);
 
     if tot == 0 {
-        return Ok(0.0);
+        return Ok(MemoryInfo::default());
     }
 
-    let used = tot.saturating_sub(avail) as f32;
-    Ok(((used / tot as f32) * 100.0).clamp(0.0, 100.0))
+    let used = tot.saturating_sub(avail);
+    let percentage = ((used as f32 / tot as f32) * 100.0).clamp(0.0, 100.0);
+    let total_gb = tot as f32 / (1024.0 * 1024.0);
+    let used_gb = used as f32 / (1024.0 * 1024.0);
+
+    Ok(MemoryInfo {
+        percentage,
+        used_gb,
+        total_gb,
+    })
+}
+
+pub fn memory_percentage() -> io::Result<f32> {
+    memory_info().map(|m| m.percentage)
+}
+
+pub fn memory_percentage_from_path(path: &Path) -> io::Result<f32> {
+    memory_info_from_path(path).map(|m| m.percentage)
 }
 
 pub fn cpu_temp_celsius() -> Option<u32> {
@@ -317,12 +340,17 @@ mod tests {
         let meminfo_path = temp_dir.path().join("meminfo");
 
         let mut file = fs::File::create(&meminfo_path).unwrap();
-        writeln!(file, "MemTotal:       1000 kB").unwrap();
-        writeln!(file, "MemFree:         200 kB").unwrap();
-        writeln!(file, "MemAvailable:    400 kB").unwrap();
+        writeln!(file, "MemTotal:       1048576 kB").unwrap();
+        writeln!(file, "MemFree:         200000 kB").unwrap();
+        writeln!(file, "MemAvailable:    419430 kB").unwrap();
+
+        let info = memory_info_from_path(&meminfo_path).unwrap();
+        assert!((info.percentage - 60.0).abs() < 0.1);
+        assert!((info.total_gb - 1.0).abs() < 0.01);
+        assert!((info.used_gb - 0.6).abs() < 0.01);
 
         let pct = memory_percentage_from_path(&meminfo_path).unwrap();
-        assert!((pct - 60.0).abs() < 0.01);
+        assert!((pct - 60.0).abs() < 0.1);
     }
 
     #[test]

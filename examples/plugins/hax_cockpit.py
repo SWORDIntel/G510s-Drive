@@ -384,6 +384,15 @@ class HaxCockpitPlugin:
                     return 5 + idx + 1
         return None
 
+    def is_visible(self):
+        """Check if HAX COCKPIT is currently displayed on the LCD GamePanel."""
+        res = send_ipc({"cmd": "get_status"}, self.sock_path)
+        if res and res.get("ok"):
+            active_page = res.get("data", {}).get("active_page")
+            my_page = self.resolve_my_page()
+            return my_page is not None and active_page == my_page
+        return False
+
     def update_cycle(self):
         """Single telemetry collection and LCD update tick."""
         procs = scan_running_processes()
@@ -571,7 +580,7 @@ class HaxCockpitPlugin:
                 self.register()
 
     def run(self):
-        """Main plugin telemetry polling loop."""
+        """Main plugin telemetry polling loop with visibility-based idle throttling."""
         if not self.register():
             while self.running and not self.registered:
                 time.sleep(2.0)
@@ -580,11 +589,16 @@ class HaxCockpitPlugin:
 
         while self.running:
             try:
-                self.update_cycle()
+                if self.is_visible():
+                    self.update_cycle()
+                    time.sleep(self.interval)
+                else:
+                    # When dormant/hidden: skip expensive /proc scans and log reads.
+                    # Sleep on a 2.5s idle heartbeat to monitor page activation.
+                    time.sleep(2.5)
             except Exception as e:
                 print(f"[hax_cockpit] Telemetry error: {e}", file=sys.stderr)
-
-            time.sleep(self.interval)
+                time.sleep(2.0)
 
         self.unregister()
 

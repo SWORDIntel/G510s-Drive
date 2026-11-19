@@ -3,12 +3,12 @@
 # Logitech G510 / G510s Suite - Debian (.deb) Package Builder
 # ==============================================================================
 # Builds a standard, reproducible, Lintian-clean .deb package for Debian/Ubuntu:
-#   - Stripped binaries in /usr/bin (g510d, g510ctl, g510tui)
+#   - Stripped binaries in /usr/bin (g510d, g510ctl, g510deck-cpp)
 #   - Udev rules in /usr/lib/udev/rules.d
 #   - Systemd units in /usr/lib/systemd/system and /usr/lib/systemd/user
 #   - Desktop entry in /usr/share/applications
 #   - Multi-resolution icons & favicon in /usr/share/icons/hicolor & pixmaps
-#   - Man pages in /usr/share/man/man1/ (g510d.1, g510ctl.1, g510tui.1)
+#   - Man pages in /usr/share/man/man1/ (g510d.1, g510ctl.1)
 #   - Changelog, copyright, and documentation in /usr/share/doc/g510s-drive
 #   - Post-install hooks (udevadm, systemctl daemon-reload, icon/desktop caches)
 #   - Optional GitHub release publishing via 'gh' CLI
@@ -115,8 +115,24 @@ else
     echo "[1/5] Skipping cargo build (--no-build specified)..."
 fi
 
+# Build the optional FTXUI C++ deck when CMake is available. With --no-build,
+# require an already-built binary rather than silently omitting the feature.
+if [[ -d "$REPO_ROOT/deck-cpp" ]]; then
+    if [[ "$DO_BUILD" -eq 1 ]]; then
+        if ! command -v cmake >/dev/null 2>&1; then
+            echo "[-] Error: cmake is required to build the C++ control deck." >&2
+            exit 1
+        fi
+        cmake -S "$REPO_ROOT/deck-cpp" -B "$REPO_ROOT/deck-cpp/build"
+        cmake --build "$REPO_ROOT/deck-cpp/build" -j"$(nproc)"
+    elif [[ ! -x "$REPO_ROOT/deck-cpp/build/g510deck-cpp" ]]; then
+        echo "[-] Error: --no-build requires deck-cpp/build/g510deck-cpp to exist." >&2
+        exit 1
+    fi
+fi
+
 # Verify binaries
-for b in g510d g510ctl g510tui g510deck; do
+for b in g510d g510ctl; do
     if [[ ! -f "$REPO_ROOT/target/release/$b" ]]; then
         echo "[-] Error: Missing required binary: $REPO_ROOT/target/release/$b" >&2
         exit 1
@@ -150,10 +166,14 @@ mkdir -p "$STAGING_DIR/usr/share/doc/$PKG_NAME"
 # Copy & strip binaries
 install -m 0755 "$REPO_ROOT/target/release/g510d" "$STAGING_DIR/usr/bin/g510d"
 install -m 0755 "$REPO_ROOT/target/release/g510ctl" "$STAGING_DIR/usr/bin/g510ctl"
-install -m 0755 "$REPO_ROOT/target/release/g510tui" "$STAGING_DIR/usr/bin/g510tui"
-install -m 0755 "$REPO_ROOT/target/release/g510deck" "$STAGING_DIR/usr/bin/g510deck"
+install -m 0755 "$REPO_ROOT/deck-cpp/build/g510deck-cpp" "$STAGING_DIR/usr/bin/g510deck-cpp"
+install -m 0755 "$REPO_ROOT/tools/g510-launch-deck-cpp" "$STAGING_DIR/usr/bin/g510-launch-deck-cpp"
+install -m 0755 "$REPO_ROOT/tools/g510deck-watchdog" "$STAGING_DIR/usr/bin/g510deck-watchdog"
+install -d "$STAGING_DIR/usr/lib/systemd/user"
+sed 's|@@PREFIX@@|/usr|g' "$REPO_ROOT/assets/g510deck-watchdog.service" \
+    > "$STAGING_DIR/usr/lib/systemd/user/g510deck-watchdog.service"
 if command -v strip >/dev/null 2>&1; then
-    strip --strip-unneeded "$STAGING_DIR/usr/bin/g510d" "$STAGING_DIR/usr/bin/g510ctl" "$STAGING_DIR/usr/bin/g510tui" "$STAGING_DIR/usr/bin/g510deck"
+    strip --strip-unneeded "$STAGING_DIR/usr/bin/g510d" "$STAGING_DIR/usr/bin/g510ctl" "$STAGING_DIR/usr/bin/g510deck-cpp"
 fi
 
 # Copy udev rules
@@ -195,8 +215,10 @@ WantedBy=default.target
 EOF
 
 # Desktop entry
-install -m 0644 "$REPO_ROOT/assets/g510deck.desktop" "$STAGING_DIR/usr/share/applications/g510deck.desktop"
-install -m 0644 "$REPO_ROOT/assets/g510tui.desktop" "$STAGING_DIR/usr/share/applications/g510tui.desktop"
+# The C++ deck replaces the legacy Rust TUI; Rust TUI source is retained behind an opt-in feature.
+install -m 0644 "$REPO_ROOT/assets/g510deck-cpp.desktop" "$STAGING_DIR/usr/share/applications/g510deck-cpp.desktop"
+install -d "$STAGING_DIR/etc/xdg/autostart"
+install -m 0644 "$REPO_ROOT/assets/g510deck-autostart.desktop" "$STAGING_DIR/etc/xdg/autostart/g510deck.desktop"
 
 # Hicolor icons
 for sz in 16 24 32 48 64 128 256 512; do
@@ -255,8 +277,7 @@ Print help message
 \fB\-V\fR, \fB\-\-version\fR
 Print version information
 .SH SEE ALSO
-.BR g510ctl (1),
-.BR g510tui (1)
+.BR g510ctl (1)
 EOF
 
 cat <<'EOF' | gzip -9n -c > "$STAGING_DIR/usr/share/man/man1/g510ctl.1.gz"
@@ -292,77 +313,7 @@ Query or toggle microphone / audio mute state
 .TP
 \fBplugin\fR \fICOMMAND\fR
 Manage dynamic LCD applet plugins over IPC
-.TP
-\fBtui\fR
-Launch interactive Terminal User Interface
 .SH SEE ALSO
-.BR g510d (1),
-.BR g510tui (1)
-EOF
-
-cat <<'EOF' | gzip -9n -c > "$STAGING_DIR/usr/share/man/man1/g510tui.1.gz"
-.TH G510TUI 1 "October 2026" "g510s-drive" "User Commands"
-.SH NAME
-g510tui \- Logitech G510 / G510s Interactive Terminal User Interface
-.SH SYNOPSIS
-.B g510tui
-.SH DESCRIPTION
-.B g510tui
-provides an interactive Ratatui-powered terminal interface for configuring
-RGB lighting, 54-key macro matrix assignments, LCD carousel screens,
-and audio diagnostics for the Logitech G510 and G510s keyboard.
-.SH KEYBINDINGS
-.TP
-\fBTab / Shift-Tab / 1-4\fR
-Switch configuration tabs
-.TP
-\fBUp / Down (k / j)\fR
-Navigate items and G-keys
-.TP
-\fBLeft / Right (h / l)\fR
-Adjust brightness slider and cycle M-profiles
-.TP
-\fBEnter / Space\fR
-Apply color preset or open macro preset picker modal
-.TP
-\fBq / Esc\fR
-Quit the TUI
-.SH SEE ALSO
-.BR g510deck (1),
-.BR g510ctl (1),
-.BR g510d (1)
-EOF
-
-cat <<'EOF' | gzip -9n -c > "$STAGING_DIR/usr/share/man/man1/g510deck.1.gz"
-.TH G510DECK 1 "October 2026" "g510-deck" "User Commands"
-.SH NAME
-g510deck \- Logitech G510 / G510s Interactive Control Deck
-.SH SYNOPSIS
-.B g510deck
-.SH DESCRIPTION
-.B g510deck
-provides an interactive Ratatui-powered terminal interface for configuring
-RGB lighting, 54-key macro matrix assignments, LCD carousel screens,
-and audio diagnostics for the Logitech G510 and G510s keyboard.
-.SH KEYBINDINGS
-.TP
-\fBTab / Shift-Tab / 1-4\fR
-Switch configuration tabs
-.TP
-\fBUp / Down (k / j)\fR
-Navigate items and G-keys
-.TP
-\fBLeft / Right (h / l)\fR
-Adjust brightness slider and cycle M-profiles
-.TP
-\fBEnter / Space\fR
-Apply color preset or open macro preset picker modal
-.TP
-\fBq / Esc\fR
-Quit the Control Deck
-.SH SEE ALSO
-.BR g510tui (1),
-.BR g510ctl (1),
 .BR g510d (1)
 EOF
 
@@ -372,12 +323,12 @@ cat <<EOF | gzip -9n -c > "$STAGING_DIR/usr/share/doc/$PKG_NAME/changelog.gz"
 $PKG_NAME ($VERSION) unstable; urgency=medium
 
   * Logitech G510 Control Deck release.
-  * Native Rust architecture (g510d, g510ctl, g510deck, g510tui).
+  * Native Rust daemon and CLI (g510d, g510ctl) with the C++ FTXUI deck.
   * Direct hidraw transport without unbinding hid-lg-g15.
   * Multi-page LCD GamePanel carousel with dynamic IPC scaling.
   * 54-key macro matrix with native uinput event injection.
   * Reactive RGB alert animations and hardware mute sync.
-  * Ratatui-powered Terminal User Interface (g510deck).
+  * Legacy Rust TUI retained as opt-in source via the legacy-tui feature.
   * XDG desktop integration, start menu entry, and multi-resolution icons.
 
  -- SWORDIntel Team <dev@swordintel.org>  $(date -R)
@@ -419,9 +370,9 @@ Maintainer: SWORDIntel Team <dev@swordintel.org>
 Installed-Size: $INSTALLED_SIZE
 Homepage: https://github.com/SWORDIntel/G510s-Drive
 Description: Logitech G510 Control Deck & GamePanel Linux Driver
- Native Rust hardware control deck, interactive 160x43 GamePanel LCD
+ Native Rust hardware daemon and CLI, interactive 160x43 GamePanel LCD
  carousel, 54-key macro matrix, reactive RGB alerts, audio mute sync,
- extensible Unix domain socket IPC plugin engine, and Ratatui TUI.
+ extensible Unix domain socket IPC plugin engine, and a C++ FTXUI control deck.
 EOF
 
 # postinst script
@@ -540,7 +491,7 @@ if [[ "$DO_RELEASE" -eq 1 ]]; then
 ## Logitech G510 Control Deck ($TAG_NAME)
 
 ### Highlights
-- **G510 Control Deck**: Full interactive hardware dashboard (\`g510deck\` or \`g510tui\`) and CLI controller (\`g510ctl\`).
+- **G510 Control Deck**: Full interactive dashboard (\`g510deck-cpp\`) and CLI controller (\`g510ctl\`).
 - **Native Rust Engine**: Ultra-lightweight background daemon (\`g510d\`) consuming ~1.5MB RAM.
 - **Direct hidraw Transport**: Non-intrusive Linux \`hidraw\` Output Report 3 transport (\`/dev/g510-lcd\`) preserving \`hid-lg-g15\` kernel driver with zero typing lockups.
 - **Multi-Page GamePanel Carousel**: System telemetry, network speedometers, security indicators, MPRIS media playback, and dynamic IPC plugins.
@@ -555,7 +506,7 @@ if [[ "$DO_RELEASE" -eq 1 ]]; then
 sudo apt install ./g510-deck_${VERSION}_${ARCH}.deb
 
 # Launch the interactive Control Deck
-g510deck
+g510deck-cpp
 \`\`\`
 EOF
 

@@ -106,6 +106,8 @@ class G502DeckPlugin:
         self.running = True
         self.last_key_ts = 0
         self.last_synced_rgb = None
+        self.g502 = None  # lazy G502Led live-control handle (False = failed)
+        self.last_ensure_ts = 0.0
         self.my_page_number = None
         self.registered = False
         self.ratbag_mod = None
@@ -156,6 +158,15 @@ class G502DeckPlugin:
                     return self.my_page_number
         return self.my_page_number
 
+    def is_visible(self):
+        """Check if G502 page is currently active on the LCD GamePanel."""
+        res = send_ipc({"cmd": "get_status"}, self.sock_path)
+        if res and res.get("ok"):
+            active_page = res.get("data", {}).get("active_page")
+            my_page = self.resolve_my_page()
+            return my_page is not None and active_page == my_page
+        return False
+
     def sync_rgb(self, mouse):
         """Synchronize G502 LEDs with the G510s keyboard backlighting."""
         if not self.rgb_sync or mouse is None:
@@ -164,11 +175,32 @@ class G502DeckPlugin:
         if kbd_rgb is None or kbd_rgb == self.last_synced_rgb:
             return
 
+        # Live path: HID++ 0x8070 SET_ZONE_EFFECT applies instantly and
+        # drives both the logo (zone 0) and DPI bars (zone 1). The ratbagd
+        # onboard-profile route is ACKed by the G502 SE but only shown after
+        # a profile reload/replug.
         try:
-            p = mouse.active_profile
-            for led in p.leds:
-                led.mode = self.ratbag_mod.RatbagdLed.Mode.ON
-                led.color = kbd_rgb
+            if self.g502 is None:
+                sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+                from g502_hid import G502Led
+                self.g502 = G502Led()
+                self.g502.open()
+            # self-heals fd loss after device re-enumeration
+            self.g502.set_color(*kbd_rgb, persist=True)
+            # keep the DPI status LEDs software-owned + lit so the bars
+            # follow the synced color instead of firmware flash-on-change
+            self.g502.ensure_dpi_led_on()
+        except Exception as e:
+            sys.stderr.write(f"[g502_deck] RGB sync error: {e}\n")
+            self.g502 = None  # force re-init next round
+            return
+
+        try:
+            # Keep onboard profiles consistent for profile switches
+            for p in mouse.profiles:
+                for led in p.leds:
+                    led.mode = self.ratbag_mod.RatbagdLed.Mode.ON
+                    led.color = kbd_rgb
             mouse.commit()
             self.last_synced_rgb = kbd_rgb
         except Exception as e:
@@ -330,10 +362,25 @@ class G502DeckPlugin:
             mouse = self.get_mouse_device()
 
             if mouse is not None:
-                # 1. Sync RGB with Keyboard
+                # 1. Sync RGB with Keyboard (cheap check, only writes on color change)
                 self.sync_rgb(mouse)
 
-                # 2. Handle interactive softkeys
+            # 2. Periodically re-assert DPI status-LED ownership so the G502
+            #    firmware can never reclaim the bars between color changes
+            if self.g502 and time.time() - self.last_ensure_ts > 30:
+                try:
+                    self.g502.ensure_dpi_led_on()
+                    self.last_ensure_ts = time.time()
+                except Exception as e:
+                    sys.stderr.write(f"[g502_deck] dpi-led re-assert error: {e}\n")
+
+            # Visibility check: only read mouse telemetry & update LCD if G502 page is on screen
+            if not self.is_visible():
+                time.sleep(2.0)
+                continue
+
+            if mouse is not None:
+                # 2. Handle interactive softkeys (only when visible)
                 self.handle_keys(mouse)
 
                 # 3. Read telemetry
@@ -377,7 +424,11 @@ class G502DeckPlugin:
                 "line3": line3[:16],
                 "bar": bar,
             }
-            send_ipc(payload, self.sock_path)
+            resp = send_ipc(payload, self.sock_path)
+            if not resp or not resp.get("ok"):
+                # g510d restarted or unregistered; trigger re-registration
+                self.registered = False
+                self.register()
 
             time.sleep(self.interval)
 

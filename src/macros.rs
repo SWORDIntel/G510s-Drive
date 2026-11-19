@@ -141,6 +141,16 @@ impl KeyInjector {
             let _ = dev.emit(&release_events);
         }
     }
+
+    pub fn emit_key(&mut self, code: u16, val: i32) {
+        if let Some(dev) = self.device.as_mut() {
+            let events = [
+                InputEvent::new(EventType::KEY.0, code, val),
+                InputEvent::new(EventType::SYNCHRONIZATION.0, 0, 0),
+            ];
+            let _ = dev.emit(&events);
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -172,8 +182,22 @@ pub struct MacroConfig {
     pub profiles: HashMap<String, HashMap<String, MacroAction>>,
     #[serde(default = "default_profile_rgb")]
     pub profile_rgb: HashMap<String, String>,
+    #[serde(default = "default_active_profile")]
+    pub active_profile: String,
     #[serde(default)]
     pub special_actions: HashMap<String, MacroAction>,
+    #[serde(default)]
+    pub disable_volume_roller: bool,
+    #[serde(default = "default_volume_debounce_ms")]
+    pub volume_debounce_ms: u64,
+}
+
+fn default_volume_debounce_ms() -> u64 {
+    80
+}
+
+fn default_active_profile() -> String {
+    "M1".to_string()
 }
 
 fn default_version() -> u32 {
@@ -214,9 +238,9 @@ pub fn default_profiles() -> HashMap<String, HashMap<String, MacroAction>> {
     m1.insert("G13".to_string(), keys_action(&["KEY_LEFTCTRL", "KEY_C"])); // Copy
     m1.insert("G14".to_string(), keys_action(&["KEY_LEFTCTRL", "KEY_V"])); // Paste
     m1.insert("G15".to_string(), keys_action(&["KEY_LEFTCTRL", "KEY_F"])); // Find
-    m1.insert("G16".to_string(), keys_action(&["KEY_LEFTCTRL", "KEY_S"])); // Save
-    m1.insert("G17".to_string(), keys_action(&["KEY_LEFTCTRL", "KEY_Z"])); // Undo
-    m1.insert("G18".to_string(), keys_action(&["KEY_LEFTCTRL", "KEY_W"])); // Close tab
+    m1.insert("G16".to_string(), exec_action(&["/usr/local/bin/g510-type", "--text", "( ͡° ͜ʖ ͡°)", "--pause-ms", "120", "--enter", "--toast", "G16 MACRO\nLENNY [ENTER]"])); // Simple Lenny + 2x pause + Enter
+    m1.insert("G17".to_string(), exec_action(&["/usr/local/bin/g510-type", "--text", "( ͡° ͜ʖ ͡°)", "--pause-ms", "60", "--enter", "--repeat", "3", "--gap-ms", "25", "--toast", "G17 MACRO\nLENNY TRIPLE TAP"])); // Lenny triple-tap rapid fire
+    m1.insert("G18".to_string(), exec_action(&["/usr/local/bin/g510-type", "--text", "( ͡°( ͡° ͜ʖ( ͡° ͜ʖ ͡°)ʖ ͡°) ͡°)", "--pause-ms", "120", "--enter", "--toast", "G18 MACRO\nNESTED LENNY [ENTER]"])); // Three-in-one Lenny + pause + Enter
     profiles.insert("M1".to_string(), m1);
 
     // -------------------------------------------------------------
@@ -238,9 +262,9 @@ pub fn default_profiles() -> HashMap<String, HashMap<String, MacroAction>> {
     m2.insert("G13".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "LAB M2\nG13 Trigger"]));
     m2.insert("G14".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "LAB M2\nG14 Trigger"]));
     m2.insert("G15".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "LAB M2\nG15 Trigger"]));
-    m2.insert("G16".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "LAB M2\nG16 Trigger"]));
-    m2.insert("G17".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "LAB M2\nG17 Trigger"]));
-    m2.insert("G18".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "LAB M2\nG18 Trigger"]));
+    m2.insert("G16".to_string(), exec_action(&["/usr/local/bin/g510-type", "--text", "( ͡° ͜ʖ ͡°)", "--pause-ms", "120", "--enter", "--toast", "G16 MACRO\nLENNY [ENTER]"])); // Simple Lenny + 2x pause + Enter
+    m2.insert("G17".to_string(), exec_action(&["/usr/local/bin/g510-type", "--text", "( ͡° ͜ʖ ͡°)", "--pause-ms", "60", "--enter", "--repeat", "3", "--gap-ms", "25", "--toast", "G17 MACRO\nLENNY TRIPLE TAP"])); // Lenny triple-tap rapid fire
+    m2.insert("G18".to_string(), exec_action(&["/usr/local/bin/g510-type", "--text", "( ͡°( ͡° ͜ʖ( ͡° ͜ʖ ͡°)ʖ ͡°) ͡°)", "--pause-ms", "120", "--enter", "--toast", "G18 MACRO\nNESTED LENNY [ENTER]"])); // Three-in-one Lenny + pause + Enter
     profiles.insert("M2".to_string(), m2);
 
     // -------------------------------------------------------------
@@ -262,9 +286,9 @@ pub fn default_profiles() -> HashMap<String, HashMap<String, MacroAction>> {
     m3.insert("G13".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "COMM M3\nG13 Trigger"]));
     m3.insert("G14".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "COMM M3\nG14 Trigger"]));
     m3.insert("G15".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "COMM M3\nG15 Trigger"]));
-    m3.insert("G16".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "COMM M3\nG16 Trigger"]));
-    m3.insert("G17".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "COMM M3\nG17 Trigger"]));
-    m3.insert("G18".to_string(), exec_action(&["/usr/local/bin/g510ctl", "toast", "COMM M3\nG18 Trigger"]));
+    m3.insert("G16".to_string(), exec_action(&["/usr/local/bin/g510-type", "--text", "( ͡° ͜ʖ ͡°)", "--pause-ms", "120", "--enter", "--toast", "G16 MACRO\nLENNY [ENTER]"])); // Simple Lenny + 2x pause + Enter
+    m3.insert("G17".to_string(), exec_action(&["/usr/local/bin/g510-type", "--text", "( ͡° ͜ʖ ͡°)", "--pause-ms", "60", "--enter", "--repeat", "3", "--gap-ms", "25", "--toast", "G17 MACRO\nLENNY TRIPLE TAP"])); // Lenny triple-tap rapid fire
+    m3.insert("G18".to_string(), exec_action(&["/usr/local/bin/g510-type", "--text", "( ͡°( ͡° ͜ʖ( ͡° ͜ʖ ͡°)ʖ ͡°) ͡°)", "--pause-ms", "120", "--enter", "--toast", "G18 MACRO\nNESTED LENNY [ENTER]"])); // Three-in-one Lenny + pause + Enter
     profiles.insert("M3".to_string(), m3);
 
     profiles
@@ -284,7 +308,10 @@ impl Default for MacroConfig {
             version: default_version(),
             profiles: default_profiles(),
             profile_rgb: default_profile_rgb(),
+            active_profile: default_active_profile(),
             special_actions: HashMap::new(),
+            disable_volume_roller: false,
+            volume_debounce_ms: default_volume_debounce_ms(),
         }
     }
 }
@@ -306,6 +333,7 @@ pub fn save_config(config: &MacroConfig, path: &Path) -> io::Result<()> {
 pub struct MacroEngine {
     pub config: MacroConfig,
     pub active_profile: String,
+    pub config_path: Option<PathBuf>,
     pub injector: KeyInjector,
     pub mr_armed: bool,
     pub recording_key: Option<String>,
@@ -313,14 +341,24 @@ pub struct MacroEngine {
 
 impl MacroEngine {
     pub fn new(config: MacroConfig) -> Self {
+        Self::with_config(config, None)
+    }
+
+    pub fn with_config(config: MacroConfig, config_path: Option<PathBuf>) -> Self {
+        let initial_profile = if ["M1", "M2", "M3"].contains(&config.active_profile.as_str()) {
+            config.active_profile.clone()
+        } else {
+            "M1".to_string()
+        };
         let mut engine = Self {
+            active_profile: initial_profile.clone(),
             config,
-            active_profile: "M1".to_string(),
+            config_path,
             injector: KeyInjector::new(),
             mr_armed: false,
             recording_key: None,
         };
-        engine.activate_profile("M1");
+        engine.activate_profile(&initial_profile);
         engine
     }
 
@@ -329,12 +367,17 @@ impl MacroEngine {
             return;
         }
         self.active_profile = profile.to_string();
+        self.config.active_profile = profile.to_string();
 
         let num: u8 = profile[1..].parse().unwrap_or(1);
         let _ = set_profile(num, None);
 
         if let Some(color) = self.config.profile_rgb.get(profile) {
             let _ = set_rgb(color, 255, "live", None);
+            let _ = set_rgb(color, 255, "power-on", None);
+        }
+        if let Some(ref path) = self.config_path {
+            let _ = save_config(&self.config, path);
         }
         eprintln!("[g510ctl] Active profile: {profile}");
     }

@@ -4,14 +4,19 @@ version = "0.2.0"
 edition = "2021"
 description = "High-performance Linux driver, daemon and CLI for Logitech G510 / G510s Gaming Keyboards"
 license = "GPL-2.0-or-later"
+autobins = false
+
+[features]
+default = []
+legacy-tui = ["dep:crossterm", "dep:ratatui"]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
-crossterm = "0.29.0"
+crossterm = { version = "0.29.0", optional = true }
 embedded-graphics = "0.8"
 evdev = "0.13"
 libc = "0.2"
-ratatui = "0.30.2"
+ratatui = { version = "0.30.2", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
@@ -29,10 +34,12 @@ path = "src/bin/g510d.rs"
 [[bin]]
 name = "g510tui"
 path = "src/bin/g510tui.rs"
+required-features = ["legacy-tui"]
 
 [[bin]]
 name = "g510deck"
 path = "src/bin/g510deck.rs"
+required-features = ["legacy-tui"]
 
 [lib]
 name = "g510"

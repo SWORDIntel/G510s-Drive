@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# G510s-Drive Macro: g510-type — clipboard-type arbitrary text, pause, Enter
+# ==============================================================================
+# Types the given text into the focused window (Discord, browsers, editors,
+# terminals) via X11 clipboard paste, waits --pause-ms, then presses Enter.
+# Supports --repeat N for rapid-fire "text+Enter" cycles with --gap-ms spacing.
+# Unicode-safe: the text never passes through uinput keycodes.
+#
+# Usage:
+#   g510-type --text "..." [--pause-ms 60] [--enter]
+#             [--repeat 1] [--gap-ms 50] [--toast "LINE1\nLINE2"]
+# ==============================================================================
+
+set -Eeuo pipefail
+
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-/home/john/.Xauthority}"
+export LC_ALL="en_US.UTF-8"
+export LANG="en_US.UTF-8"
+
+TEXT=""
+PAUSE_MS=60
+DO_ENTER=0
+TOAST=""
+REPEAT=1
+GAP_MS=50
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --text)      TEXT="$2"; shift 2 ;;
+        --pause-ms)  PAUSE_MS="$2"; shift 2 ;;
+        --enter)     DO_ENTER=1; shift ;;
+        --toast)     TOAST="$2"; shift 2 ;;
+        --repeat)    REPEAT="$2"; shift 2 ;;
+        --gap-ms)    GAP_MS="$2"; shift 2 ;;
+        *) echo "unknown arg: $1" >&2; exit 2 ;;
+    esac
+done
+
+[[ -n "$TEXT" ]] || { echo "g510-type: --text required" >&2; exit 2; }
+
+msleep() {  # msleep <milliseconds> — 3-digit fractional sleep
+    printf -v _f "%.3f" "$(( $1 / 1000 )).$(( $1 % 1000 ))"
+    sleep "$_f"
+}
+
+# 1. Optional LCD toast on the G510 GamePanel (non-blocking)
+if [[ -n "$TOAST" ]] && [[ -x /usr/local/bin/g510ctl ]]; then
+    /usr/local/bin/g510ctl toast "$TOAST" 1200 >/dev/null 2>&1 || true
+fi
+
+# 2. Populate X11 CLIPBOARD and PRIMARY selection
+if command -v xclip >/dev/null 2>&1; then
+    printf "%s" "$TEXT" | xclip -selection clipboard 2>/dev/null || true
+    printf "%s" "$TEXT" | xclip -selection primary 2>/dev/null || true
+fi
+
+# 3. Paste into the active window, pause, Enter — repeat as requested
+if command -v xdotool >/dev/null 2>&1; then
+    # Settle delay so G-key release doesn't conflict with paste combo
+    sleep 0.05
+
+    ACTIVE_WIN="$(xdotool getactivewindow 2>/dev/null || true)"
+    IS_TERMINAL=0
+    if [[ -n "$ACTIVE_WIN" ]] && command -v xprop >/dev/null 2>&1; then
+        WM_CLASS="$(xprop -id "$ACTIVE_WIN" WM_CLASS 2>/dev/null | tr '[:upper:]' '[:lower:]' || true)"
+        if [[ "$WM_CLASS" =~ (terminal|konsole|xterm|kitty|alacritty|urxvt|tilix) ]]; then
+            IS_TERMINAL=1
+        fi
+    fi
+
+    CYCLE=1
+    while [[ $CYCLE -le $REPEAT ]]; do
+        if [[ "$IS_TERMINAL" -eq 1 ]]; then
+            xdotool key --clearmodifiers ctrl+shift+v 2>/dev/null || xdotool key --clearmodifiers Shift+Insert 2>/dev/null || true
+        else
+            xdotool key --clearmodifiers ctrl+v 2>/dev/null || true
+        fi
+
+        # Delay so the target app processes the paste event
+        msleep "$PAUSE_MS"
+
+        if [[ "$DO_ENTER" -eq 1 ]]; then
+            xdotool key --clearmodifiers Return 2>/dev/null || true
+        fi
+
+        CYCLE=$((CYCLE + 1))
+        if [[ $CYCLE -le $REPEAT ]]; then
+            msleep "$GAP_MS"  # rapid-fire spacing between cycles
+        fi
+    done
+fi

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Keep the C++ deck visible in a terminal; reopen it if the TUI or terminal dies.
+set -Eeuo pipefail
+
+uid="$(id -u)"
+launcher="$(command -v g510-launch-deck-cpp || true)"
+if [[ -z "$launcher" ]]; then
+    echo "g510-launch-deck-cpp is not installed or not on PATH" >&2
+    exit 127
+fi
+
+trap 'exit 0' TERM INT HUP
+while :; do
+    if pgrep -u "$uid" -x g510deck-cpp >/dev/null 2>&1; then
+        sleep 5
+        continue
+    fi
+
+    "$launcher" || true
+    # Give the terminal and app time to start; if launch failed, retry gently.
+    sleep 10
+done

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# G510s-Drive: 1-Minute Hardware & Daemon Watchdog
+# ==============================================================================
+# Verifies that:
+# 1. g510-status.service is actively running
+# 2. g510d responds to IPC health queries (not deadlocked or hung)
+# 3. /dev/g510-lcd device node exists and is accessible
+# 4. If any check fails, immediately recovers the daemon and triggers udev settling.
+# ==============================================================================
+
+set -Eeuo pipefail
+
+LOG_TAG="g510-watchdog"
+
+log_info() {
+    logger -t "$LOG_TAG" "[INFO] $*"
+}
+
+log_warn() {
+    logger -t "$LOG_TAG" "[WARN] $*"
+    echo "[$LOG_TAG] [WARN] $*" >&2
+}
+
+# 1. Check if the systemd unit is active
+if ! systemctl is-active --quiet g510-status.service; then
+    log_warn "g510-status.service is not active. Restarting..."
+    systemctl restart g510-status.service
+    exit 0
+fi
+
+# 2. Check IPC responsiveness (4s timeout)
+if ! timeout 4 /usr/local/bin/g510ctl status >/dev/null 2>&1; then
+    log_warn "g510d daemon is unresponsive over IPC. Restarting service..."
+    systemctl restart g510-status.service
+    exit 0
+fi
+
+# 3. Check /dev/g510-lcd presence
+if [[ ! -e /dev/g510-lcd ]]; then
+    log_warn "/dev/g510-lcd node missing. Triggering udev and restarting..."
+    udevadm trigger --subsystem-match=hidraw || true
+    sleep 1
+    systemctl restart g510-status.service
+    exit 0
+fi
+
+# 4. Check for unrecovered device errors in recent journal
+RECENT_ERRORS=$(journalctl -u g510-status.service --since "1 minute ago" --no-pager 2>/dev/null | grep -c "No such device" || true)
+if [[ "$RECENT_ERRORS" -gt 15 ]]; then
+    log_warn "Detected $RECENT_ERRORS unrecovered device errors in past minute. Restarting service..."
+    systemctl restart g510-status.service
+    exit 0
+fi
+
+exit 0

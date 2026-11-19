@@ -1,0 +1,13 @@
+[Unit]
+Description=Logitech G510 C++ Control Deck watchdog
+After=graphical-session.target g510-status.service
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=@@PREFIX@@/bin/g510deck-watchdog
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

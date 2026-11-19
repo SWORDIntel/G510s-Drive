@@ -1,0 +1,7 @@
+[Unit]
+Description=Logitech G510 Keyboard & LCD Health Watchdog
+After=g510-status.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/g510-watchdog

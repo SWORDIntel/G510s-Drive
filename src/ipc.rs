@@ -37,6 +37,8 @@ pub enum IpcRequest {
     },
     #[serde(rename = "set_page")]
     SetPage { number: usize },
+    #[serde(rename = "set_profile")]
+    SetProfile { number: u8 },
     #[serde(rename = "register_page")]
     RegisterPage {
         id: String,
@@ -81,6 +83,9 @@ pub enum IpcRequest {
     },
     #[serde(rename = "get_status")]
     GetStatus,
+    /// Read-only snapshot of the last framebuffer successfully written by g510d.
+    #[serde(rename = "lcd_mirror")]
+    LcdMirror,
 }
 
 fn default_toast_duration() -> u64 {
@@ -141,8 +146,11 @@ pub struct IpcState {
     pub dynamic_pages: Arc<Mutex<Vec<DynamicPage>>>,
     pub pending_toast: Arc<Mutex<Option<(String, Duration)>>>,
     pub pending_page: Arc<Mutex<Option<usize>>>,
+    pub macro_engine: Option<Arc<Mutex<crate::macros::MacroEngine>>>,
     pub pending_alert: Arc<Mutex<Option<crate::alerts::RgbAlert>>>,
     pub active_page: Arc<AtomicUsize>,
+    /// Last successfully transmitted G510 Report 3 (992 bytes), including header/padding.
+    pub last_frame: Arc<Mutex<Option<Vec<u8>>>>,
 }
 
 pub struct IpcServer {
@@ -241,6 +249,21 @@ pub fn process_request(req: IpcRequest, state: &IpcState) -> IpcResponse {
                 *p = Some(number);
             }
             IpcResponse::success(None)
+        }
+        IpcRequest::SetProfile { number } => {
+            if !(1..=3).contains(&number) {
+                return IpcResponse::err("Profile number must be 1, 2, or 3");
+            }
+            if let Some(engine) = &state.macro_engine {
+                if let Ok(mut engine) = engine.lock() {
+                    engine.activate_profile(&format!("M{number}"));
+                    IpcResponse::success(None)
+                } else {
+                    IpcResponse::err("Macro engine lock error")
+                }
+            } else {
+                IpcResponse::err("Profile control unavailable")
+            }
         }
         IpcRequest::RegisterPage {
             id,
@@ -351,6 +374,21 @@ pub fn process_request(req: IpcRequest, state: &IpcState) -> IpcResponse {
             }
             IpcResponse::success(None)
         }
+        IpcRequest::LcdMirror => {
+            if let Ok(frame) = state.last_frame.lock() {
+                match frame.as_ref() {
+                    Some(bytes) => IpcResponse::success(Some(serde_json::json!({
+                        "width": 160,
+                        "height": 43,
+                        "encoding": "g510_report3_bytes",
+                        "data": bytes,
+                    }))),
+                    None => IpcResponse::err("No LCD frame has been written yet"),
+                }
+            } else {
+                IpcResponse::err("Framebuffer snapshot lock error")
+            }
+        }
         IpcRequest::GetStatus => {
             let pages_count = state.dynamic_pages.lock().map_or(0, |p| p.len());
             let current_page = state.active_page.load(Ordering::SeqCst) + 1;
@@ -412,6 +450,8 @@ mod tests {
 
         let list = IpcRequest::ListPages;
         assert_eq!(serde_json::to_string(&list).unwrap(), "{\"cmd\":\"list_pages\"}");
+        assert_eq!(serde_json::to_string(&IpcRequest::LcdMirror).unwrap(), "{\"cmd\":\"lcd_mirror\"}");
+        assert_eq!(serde_json::to_string(&IpcRequest::SetProfile { number: 2 }).unwrap(), "{\"cmd\":\"set_profile\",\"number\":2}");
     }
 
     #[test]
@@ -421,6 +461,28 @@ mod tests {
         // 1. Ping
         let res_ping = process_request(IpcRequest::Ping, &state);
         assert!(res_ping.ok);
+
+        let bad_profile = process_request(IpcRequest::SetProfile { number: 4 }, &state);
+        assert!(!bad_profile.ok);
+        assert!(!process_request(IpcRequest::SetProfile { number: 2 }, &state).ok);
+        let mut profile_state = state.clone();
+        profile_state.macro_engine = Some(Arc::new(Mutex::new(crate::macros::MacroEngine::new(
+            crate::macros::MacroConfig::default(),
+        ))));
+        assert!(process_request(IpcRequest::SetProfile { number: 2 }, &profile_state).ok);
+        assert_eq!(profile_state.macro_engine.as_ref().unwrap().lock().unwrap().active_profile, "M2");
+
+        let unavailable = process_request(IpcRequest::LcdMirror, &state);
+        assert!(!unavailable.ok);
+        *state.last_frame.lock().unwrap() = Some(vec![3; 992]);
+        let mirror = process_request(IpcRequest::LcdMirror, &state);
+        assert!(mirror.ok);
+        let data = mirror.data.unwrap();
+        assert_eq!(data["width"], 160);
+        assert_eq!(data["height"], 43);
+        assert_eq!(data["encoding"], "g510_report3_bytes");
+        assert_eq!(data["data"].as_array().unwrap().len(), 992);
+        assert_eq!(data["data"][0], 3);
 
         // 2. Register page
         let res_reg = process_request(

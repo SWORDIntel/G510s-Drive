@@ -217,18 +217,32 @@ impl App {
     pub fn new() -> Self {
         let config_path = default_config_path();
         let macro_config = load_config(&config_path).unwrap_or_default();
+        Self::with_config(macro_config, config_path)
+    }
+
+    pub fn with_config(macro_config: MacroConfig, config_path: PathBuf) -> Self {
         let hardware_snap = snapshot(None);
         let mic_muted = get_microphone_mute();
         let audio_muted = get_audio_mute();
 
         let initial_brightness = hardware_snap.live_rgb.as_ref().map_or(255, |s| s.brightness);
+        let active_profile = match macro_config.active_profile.as_str() {
+            "M2" => 1,
+            "M3" => 2,
+            _ => 0,
+        };
+        let color_idx = if let Some(c) = macro_config.profile_rgb.get(&macro_config.active_profile) {
+            COLOR_PRESETS.iter().position(|p| p.hex.eq_ignore_ascii_case(c)).unwrap_or(0)
+        } else {
+            0
+        };
 
         let mut app = Self {
             selected_tab: 0,
-            color_idx: 0,
+            color_idx,
             brightness: initial_brightness,
             target_mode: "live",
-            active_profile: 0,
+            active_profile,
             selected_g_key: 0,
             macro_config,
             config_path,
@@ -286,7 +300,14 @@ impl App {
         let preset = &COLOR_PRESETS[self.color_idx];
         match set_rgb(preset.hex, self.brightness, self.target_mode, None) {
             Ok(state) => {
-                self.set_status(format!("Set {} RGB to {} (brightness: {}/255)", self.target_mode, state.hex, state.brightness));
+                if self.target_mode == "live" {
+                    let _ = set_rgb(preset.hex, self.brightness, "power-on", None);
+                }
+                let prof = self.profile_name().to_string();
+                self.macro_config.profile_rgb.insert(prof, preset.hex.to_string());
+                self.macro_config.active_profile = self.profile_name().to_string();
+                let _ = save_config(&self.macro_config, &self.config_path);
+                self.set_status(format!("Set {} RGB to {} (saved)", self.target_mode, state.hex));
             }
             Err(e) => {
                 self.set_status(format!("Error setting RGB: {e}"));
@@ -299,7 +320,14 @@ impl App {
         if let Err(e) = set_profile(prof, None) {
             self.set_status(format!("Error setting profile LED: {e}"));
         } else {
-            self.set_status(format!("Switched hardware indicator to M{prof}"));
+            let prof_name = format!("M{prof}");
+            self.macro_config.active_profile = prof_name.clone();
+            if let Some(color) = self.macro_config.profile_rgb.get(&prof_name) {
+                let _ = set_rgb(color, self.brightness, "live", None);
+                let _ = set_rgb(color, self.brightness, "power-on", None);
+            }
+            let _ = save_config(&self.macro_config, &self.config_path);
+            self.set_status(format!("Switched hardware indicator to M{prof} (saved)"));
         }
         self.refresh_status();
     }
@@ -1308,7 +1336,7 @@ mod tests {
 
     #[test]
     fn test_app_state_defaults() {
-        let app = App::new();
+        let app = App::with_config(MacroConfig::default(), PathBuf::from("/tmp/nonexistent_g510_test.json"));
         assert_eq!(app.selected_tab, 0);
         assert_eq!(app.active_profile, 0);
         assert_eq!(app.profile_name(), "M1");

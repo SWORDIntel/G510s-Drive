@@ -9,6 +9,7 @@ pub mod plugins;
 pub mod render;
 pub mod telemetry;
 pub mod transport;
+#[cfg(feature = "legacy-tui")]
 pub mod tui;
 
 pub fn version() -> &'static str {

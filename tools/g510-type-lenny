@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# G510s-Drive Macro: Type Lenny Face ( ͡° ͜ʖ ͡°) & Press Enter
+# ==============================================================================
+# Injects the Unicode Lenny face "( ͡° ͜ʖ ͡°)" into the currently focused window
+# (supporting Discord, web browsers, text editors, and terminal emulators),
+# followed by an Enter (Return) keystroke.
+# Also triggers an informational LCD toast on the Logitech G510 GamePanel.
+# ==============================================================================
+
+set -Eeuo pipefail
+
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-/home/john/.Xauthority}"
+export LC_ALL="en_US.UTF-8"
+export LANG="en_US.UTF-8"
+
+LENNY="( ͡° ͜ʖ ͡°)"
+
+# 1. Trigger LCD toast on G510 GamePanel (non-blocking)
+if [[ -x /usr/local/bin/g510ctl ]]; then
+    /usr/local/bin/g510ctl toast "G16 MACRO\n( ͡° ͜ʖ ͡°) [ENTER]" 1200 >/dev/null 2>&1 || true
+fi
+
+# 2. Populate X11 CLIPBOARD and PRIMARY selection
+if command -v xclip >/dev/null 2>&1; then
+    printf "%s" "$LENNY" | xclip -selection clipboard 2>/dev/null || true
+    printf "%s" "$LENNY" | xclip -selection primary 2>/dev/null || true
+fi
+
+# 3. Paste into the active window and press Enter
+if command -v xdotool >/dev/null 2>&1; then
+    # Settle delay so G-key release doesn't conflict with paste combo
+    sleep 0.05
+
+    ACTIVE_WIN="$(xdotool getactivewindow 2>/dev/null || true)"
+    IS_TERMINAL=0
+    if [[ -n "$ACTIVE_WIN" ]] && command -v xprop >/dev/null 2>&1; then
+        WM_CLASS="$(xprop -id "$ACTIVE_WIN" WM_CLASS 2>/dev/null | tr '[:upper:]' '[:lower:]' || true)"
+        if [[ "$WM_CLASS" =~ (terminal|konsole|xterm|kitty|alacritty|urxvt|tilix) ]]; then
+            IS_TERMINAL=1
+        fi
+    fi
+
+    if [[ "$IS_TERMINAL" -eq 1 ]]; then
+        xdotool key --clearmodifiers ctrl+shift+v 2>/dev/null || xdotool key --clearmodifiers Shift+Insert 2>/dev/null || true
+    else
+        xdotool key --clearmodifiers ctrl+v 2>/dev/null || true
+    fi
+
+    # Delay to ensure target app processes paste event before Enter
+    sleep 0.06
+
+    # Press Enter (Return)
+    xdotool key --clearmodifiers Return 2>/dev/null || true
+fi

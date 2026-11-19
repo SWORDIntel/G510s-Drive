@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use clap::Parser;
 
 use g510::{
-    events::{find_gaming_device, key_from_code, G510Key},
+    events::{find_consumer_device, find_gaming_device, key_from_code, G510Key},
     framebuffer::G510Framebuffer,
     ipc::{IpcServer, IpcState},
     macros::{default_config_path, load_config, MacroConfig, MacroEngine},
@@ -16,7 +16,7 @@ use g510::{
         render_security_screen, render_system_screen, render_toast_screen, TOTAL_BUILTIN_PAGES,
     },
     telemetry::{
-        check_vpn, cpu_temp_celsius, current_time_str, load_average, memory_percentage,
+        check_vpn, cpu_temp_celsius, current_time_str, memory_info,
         read_agent_status, read_default_route, read_iface_bytes, read_mpris_media,
         read_security_stats, CpuCounters,
     },
@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         MacroConfig::default()
     };
 
-    let engine = Arc::new(Mutex::new(MacroEngine::new(cfg)));
+    let engine = Arc::new(Mutex::new(MacroEngine::with_config(cfg, Some(config_path.clone()))));
     let active_page = Arc::new(AtomicUsize::new(0));
     let active_toast = Arc::new(Mutex::new(None::<(String, Instant, Duration)>));
 
@@ -111,8 +111,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         dynamic_pages: Arc::new(Mutex::new(Vec::new())),
         pending_toast: Arc::new(Mutex::new(None)),
         pending_page: Arc::new(Mutex::new(None)),
+        macro_engine: Some(Arc::clone(&engine)),
         pending_alert: Arc::new(Mutex::new(None)),
         active_page: Arc::clone(&active_page),
+        last_frame: Arc::new(Mutex::new(None)),
     };
 
     let ipc_server = IpcServer::new(ipc_state.clone());
@@ -135,26 +137,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dyn_pages_keys = Arc::clone(&ipc_state.dynamic_pages);
 
     let _key_thread = thread::spawn(move || {
-        let mut dev_opt = None;
-        for _ in 0..10 {
-            if SHUTDOWN.load(Ordering::SeqCst) {
-                return;
+        while !SHUTDOWN.load(Ordering::SeqCst) {
+            let mut dev_opt = None;
+            for _ in 0..60 {
+                if SHUTDOWN.load(Ordering::SeqCst) {
+                    return;
+                }
+                if let Ok(pair) = find_gaming_device() {
+                    dev_opt = Some(pair);
+                    break;
+                }
+                thread::sleep(Duration::from_millis(500));
             }
-            if let Ok(pair) = find_gaming_device() {
-                dev_opt = Some(pair);
-                break;
-            }
-            thread::sleep(Duration::from_millis(500));
-        }
 
-        if let Some((path, mut device)) = dev_opt {
-            println!("[g510d] Monitoring gaming keys on {}", path.display());
-            while !SHUTDOWN.load(Ordering::SeqCst) {
-                if let Ok(events) = device.fetch_events() {
-                    for event in events {
-                        if event.event_type() == evdev::EventType::KEY && event.value() == 1 {
-                            if let Some(key) = key_from_code(event.code()) {
-                                match &key {
+            if let Some((path, mut device)) = dev_opt {
+                println!("[g510d] Monitoring gaming keys on {}", path.display());
+                while !SHUTDOWN.load(Ordering::SeqCst) {
+                    match device.fetch_events() {
+                        Ok(events) => {
+                            for event in events {
+                                if event.event_type() == evdev::EventType::KEY && event.value() == 1 {
+                                    if let Some(key) = key_from_code(event.code()) {
+                                        match &key {
                                     G510Key::LcdMenu(1) => {
                                         // L1: Previous Page
                                         let dyn_count = dyn_pages_keys.lock().map_or(0, |p| p.len());
@@ -307,10 +311,96 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 }
+                Err(e) => {
+                        eprintln!("[g510d] Gaming keys device error: {e}. Reconnecting...");
+                        break;
+                    }
+                }
                 thread::sleep(Duration::from_millis(40));
             }
         } else {
-            eprintln!("[g510d] Gaming evdev node not accessible; macro listening disabled");
+            eprintln!("[g510d] Gaming evdev node not accessible; retrying in 2s...");
+            thread::sleep(Duration::from_secs(2));
+        }
+    }
+});
+
+    // Spawn evdev listener thread for Consumer Control (media keys & volume roller debounce shield)
+    let engine_consumer = Arc::clone(&engine);
+    let _consumer_thread = thread::spawn(move || {
+        while !SHUTDOWN.load(Ordering::SeqCst) {
+            let mut dev_opt = None;
+            for _ in 0..60 {
+                if SHUTDOWN.load(Ordering::SeqCst) {
+                    return;
+                }
+                if let Ok(pair) = find_consumer_device() {
+                    dev_opt = Some(pair);
+                    break;
+                }
+                thread::sleep(Duration::from_millis(500));
+            }
+
+            if let Some((path, mut device)) = dev_opt {
+                if let Err(e) = device.grab() {
+                    eprintln!("[g510d] Consumer control grab failed on {}: {e}", path.display());
+                    thread::sleep(Duration::from_secs(2));
+                    continue;
+                }
+                println!("[g510d] Exclusive grab on volume-capable Consumer Control (KEY_VOLUMEDOWN=114, KEY_VOLUMEUP=115) on {}", path.display());
+
+                let mut last_vol_time = Instant::now() - Duration::from_secs(10);
+
+                while !SHUTDOWN.load(Ordering::SeqCst) {
+                    match device.fetch_events() {
+                        Ok(events) => {
+                            for event in events {
+                                if event.event_type() != evdev::EventType::KEY {
+                                    continue;
+                                }
+                                let code = event.code();
+                                let val = event.value();
+
+                                if let Ok(mut eng) = engine_consumer.lock() {
+                                    match code {
+                                        // Volume Down (114) / Volume Up (115)
+                                        114 | 115 => {
+                                            if eng.config.disable_volume_roller {
+                                                continue;
+                                            }
+                                            if val == 1 {
+                                                let now = Instant::now();
+                                                let elapsed = now.duration_since(last_vol_time);
+                                                let min_interval = Duration::from_millis(eng.config.volume_debounce_ms.max(40));
+
+                                                if elapsed < min_interval {
+                                                    continue;
+                                                }
+
+                                                last_vol_time = now;
+                                                eng.injector.emit_key(code, 1);
+                                                eng.injector.emit_key(code, 0);
+                                            }
+                                        }
+                                        // Media keys: pass through to uinput
+                                        113 | 163..=166 => {
+                                            eng.injector.emit_key(code, val);
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("[g510d] Consumer control device error: {e}. Reconnecting...");
+                            break;
+                        }
+                    }
+                    thread::sleep(Duration::from_millis(20));
+                }
+            } else {
+                thread::sleep(Duration::from_secs(2));
+            }
         }
     });
 
@@ -325,11 +415,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => {
                     attempts += 1;
-                    if attempts >= 10 || SHUTDOWN.load(Ordering::SeqCst) {
+                    if attempts >= 30 || SHUTDOWN.load(Ordering::SeqCst) {
                         eprintln!("[g510d] Error: cannot open LCD transport after {attempts} attempts: {e}");
                         return Err(e.into());
                     }
-                    eprintln!("[g510d] Waiting for LCD transport ({attempts}/10): {e}...");
+                    eprintln!("[g510d] Waiting for LCD transport ({attempts}/30): {e}...");
                     thread::sleep(Duration::from_secs(1));
                 }
             }
@@ -455,10 +545,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let cur_cpu = CpuCounters::read().unwrap_or_default();
                     let cpu_pct = cur_cpu.percentage_since(&prev_cpu);
                     prev_cpu = cur_cpu;
-                    let mem_pct = memory_percentage().unwrap_or(0.0);
+                    let mem = memory_info().unwrap_or_default();
                     let temp_c = cpu_temp_celsius();
-                    let (load1, _, _) = load_average();
-                    render_system_screen(&mut fb, 0, total_pages, cpu_pct, mem_pct, temp_c, load1, &clock);
+                    render_system_screen(&mut fb, 0, total_pages, cpu_pct, mem.percentage, temp_c, mem.total_gb, &clock);
                 }
                 1 => {
                     // Network & VPN Throughput
@@ -511,8 +600,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         if let Err(e) = transport.write_framebuffer(&fb, args.invert) {
-            eprintln!("[g510d] LCD write error: {e}");
+            eprintln!("[g510d] LCD write error: {e}. Attempting auto-reconnect...");
             thread::sleep(Duration::from_millis(500));
+            if let Ok(new_transport) = G510Transport::open() {
+                println!("[g510d] LCD transport auto-reconnected on {}", new_transport.path().display());
+                transport = new_transport;
+            }
+        } else {
+            // Mirror only what was successfully sent; pack_report is the exact HID frame
+            // transport writes, including the daemon's inversion setting.
+            if let Ok(mut snapshot) = ipc_state.last_frame.lock() {
+                *snapshot = Some(fb.pack_report(args.invert).to_vec());
+            }
+            notify_watchdog();
         }
 
         thread::sleep(step);
@@ -524,4 +624,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = h.join();
     }
     Ok(())
+}
+
+fn notify_watchdog() {
+    if let Ok(sock_path) = std::env::var("NOTIFY_SOCKET") {
+        use std::os::unix::net::UnixDatagram;
+        if let Ok(socket) = UnixDatagram::unbound() {
+            let _ = socket.send_to(b"WATCHDOG=1
+READY=1", &sock_path);
+        }
+    }
 }

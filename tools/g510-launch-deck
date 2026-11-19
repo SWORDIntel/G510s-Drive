@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# G510s-Drive: Launch Control Deck (TUI) in Desktop Terminal
+# ==============================================================================
+set -Eeuo pipefail
+
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-/home/john/.Xauthority}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/1000/bus}"
+
+# Avoid duplicate deck instances if already running
+if pgrep -x g510deck >/dev/null 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] g510deck is already running" >> /tmp/g510deck-launch.log 2>&1 || true
+    if command -v wmctrl >/dev/null 2>&1; then
+        wmctrl -a "Logitech G510 Control Deck" 2>/dev/null || wmctrl -a "g510deck" 2>/dev/null || true
+    fi
+    exit 0
+fi
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] g510-launch-deck invoked (UID=$UID, DISPLAY=$DISPLAY)" >> /tmp/g510deck-launch.log 2>&1 || true
+
+# Launch in available terminal emulator (prefer xfce4-terminal as configured)
+if command -v xfce4-terminal >/dev/null 2>&1; then
+    exec /usr/bin/xfce4-terminal --title="Logitech G510 Control Deck" -e /usr/local/bin/g510deck >> /tmp/g510deck-launch.log 2>&1
+elif command -v konsole >/dev/null 2>&1; then
+    exec /usr/bin/konsole -e /usr/local/bin/g510deck >> /tmp/g510deck-launch.log 2>&1
+elif command -v tilix >/dev/null 2>&1; then
+    exec /usr/bin/tilix -e /usr/local/bin/g510deck >> /tmp/g510deck-launch.log 2>&1
+else
+    exec /usr/bin/x-terminal-emulator -e /usr/local/bin/g510deck >> /tmp/g510deck-launch.log 2>&1
+fi

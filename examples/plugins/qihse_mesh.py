@@ -167,6 +167,25 @@ class QihseMeshPlugin:
             send_ipc({"cmd": "unregister_page", "id": PLUGIN_ID}, self.sock_path)
             self.registered = False
 
+    def resolve_my_page(self):
+        """Resolve current 1-indexed carousel page number for QIHSE MESH."""
+        resp = send_ipc({"cmd": "list_pages"}, self.sock_path)
+        if resp and resp.get("ok"):
+            pages = resp.get("data", [])
+            for idx, p in enumerate(pages):
+                if p.get("id") == PLUGIN_ID:
+                    return 5 + idx + 1
+        return None
+
+    def is_visible(self):
+        """Check if QIHSE MESH is currently displayed on the LCD GamePanel."""
+        res = send_ipc({"cmd": "get_status"}, self.sock_path)
+        if res and res.get("ok"):
+            active_page = res.get("data", {}).get("active_page")
+            my_page = self.resolve_my_page()
+            return my_page is not None and active_page == my_page
+        return False
+
     def update_cycle(self):
         """Poll cluster state and update LCD."""
         # 1. Probe Peer 730xd (Primary Cluster Peer)
@@ -266,7 +285,7 @@ class QihseMeshPlugin:
                 self.register()
 
     def run(self):
-        """Main telemetry loop."""
+        """Main telemetry loop with visibility-based idle throttling."""
         if not self.register():
             while self.running and not self.registered:
                 time.sleep(2.0)
@@ -275,11 +294,16 @@ class QihseMeshPlugin:
 
         while self.running:
             try:
-                self.update_cycle()
+                if self.is_visible():
+                    self.update_cycle()
+                    time.sleep(self.interval)
+                else:
+                    # When dormant/hidden: skip TCP peer probes and Redis queries.
+                    # Sleep on a 2.5s idle heartbeat to monitor page activation.
+                    time.sleep(2.5)
             except Exception as e:
                 print(f"[qihse_mesh] Telemetry error: {e}", file=sys.stderr)
-
-            time.sleep(self.interval)
+                time.sleep(2.0)
 
         self.unregister()
 

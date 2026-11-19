@@ -53,7 +53,7 @@ pub fn render_system_screen(
     cpu_pct: f32,
     mem_pct: f32,
     temp_c: Option<u32>,
-    load1: f32,
+    mem_total_gb: f32,
     clock: &str,
 ) {
     fb.clear();
@@ -62,18 +62,18 @@ pub fn render_system_screen(
 
     // CPU Row (y=21)
     let _ = Text::new("CPU", Point::new(1, 21), text_style).draw(fb);
-    let _ = draw_bar(fb, 24, 14, 75, cpu_pct);
+    let _ = draw_bar(fb, 24, 14, 64, cpu_pct);
     let temp_str = match temp_c {
-        Some(t) => format!("{:>3.0}%{:>3}°C", cpu_pct, t),
+        Some(t) => format!("{:>3.0}% {:>4}C", cpu_pct, t),
         None => format!("{:>3.0}%", cpu_pct),
     };
-    let _ = Text::new(&temp_str, Point::new(103, 21), text_style).draw(fb);
+    let _ = Text::new(&temp_str, Point::new(94, 21), text_style).draw(fb);
 
     // RAM Row (y=37)
     let _ = Text::new("RAM", Point::new(1, 37), text_style).draw(fb);
-    let _ = draw_bar(fb, 24, 30, 75, mem_pct);
-    let mem_str = format!("{:>3.0}%{:>4.1}L", mem_pct, load1);
-    let _ = Text::new(&mem_str, Point::new(103, 37), text_style).draw(fb);
+    let _ = draw_bar(fb, 24, 30, 64, mem_pct);
+    let mem_str = format!("{:>3.0}% {:>5.1}G", mem_pct, mem_total_gb);
+    let _ = Text::new(&mem_str, Point::new(94, 37), text_style).draw(fb);
 }
 
 /// Page 1: Network & VPN Throughput
@@ -257,7 +257,7 @@ mod tests {
     fn test_carousel_screens_render_pixels() {
         let mut fb = G510Framebuffer::new();
 
-        render_system_screen(&mut fb, 0, 5, 50.0, 75.0, Some(49), 1.5, "12:34");
+        render_system_screen(&mut fb, 0, 5, 50.0, 75.0, Some(49), 110.2, "12:34");
         assert!(fb.pack_report(false)[32..].iter().any(|&b| b > 0));
 
         render_network_screen(&mut fb, 1, 5, "vmbr0", "192.168.1.91", 120.0, 45.0, true, "12:34");

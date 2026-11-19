@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Logitech G510 Control Deck (C++)
+GenericName=G510 Hardware & GamePanel Control Deck
+Comment=FTXUI control deck for Logitech G510/G510s (RGB, Macros, LCD, Audio)
+Exec=g510-launch-deck-cpp
+Icon=g510deck
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=logitech;g510;g510s;keyboard;rgb;macro;lcd;gamepanel;deck;ftxui;
+StartupNotify=false

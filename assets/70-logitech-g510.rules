@@ -11,3 +11,7 @@ KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", GROUP="plugdev", MODE="0660
 
 # Grant access to G510 LED attributes for brightness and RGB multi_intensity
 SUBSYSTEM=="leds", KERNEL=="g15*", RUN+="/bin/sh -c 'chgrp plugdev /sys%p/brightness /sys%p/multi_intensity 2>/dev/null || true; chmod g+w /sys%p/brightness /sys%p/multi_intensity 2>/dev/null || true'"
+
+# Logitech G502 HERO / SE Gaming Mouse (046d:c08b) — hidraw access for
+# live LED control via HID++ 2.0 feature 0x8070 (Color LED Effects)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c08b", TAG+="uaccess", GROUP="plugdev", MODE="0660"

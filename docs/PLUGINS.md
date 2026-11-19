@@ -273,6 +273,29 @@ Queries daemon status, current active carousel page, and registered plugin count
 }
 ```
 
+### `set_profile`
+Switches the active macro map and persists the profile through the daemon's existing config path. The profile number must be 1, 2, or 3.
+
+**Request:**
+```json
+{"cmd": "set_profile", "number": 2}
+```
+**Response:** `{"ok": true}` after the live macro engine has applied the selection.
+
+### `lcd_mirror`
+Returns the last LCD report successfully written by `g510d`; it is a read-only snapshot and is not a hardware readback. The reply contains a 160×43 frame in G510 Report 3 layout (report ID, padding, then six vertical pixel blocks). It fails until the daemon has written its first frame.
+
+**Request:**
+```json
+{"cmd": "lcd_mirror"}
+```
+
+**Response:**
+```json
+{"ok": true, "data": {"width": 160, "height": 43, "encoding": "g510_report3_bytes", "data": [3, 0, 0]}}
+```
+`data` is exactly 992 byte values; the abbreviated array above is illustrative. Pixel bytes start at offset 32, with bit 0 at the top of each 8-pixel vertical block.
+
 ---
 
 ## 4. LCD Layout & Design Guidelines
@@ -472,4 +495,41 @@ Run directly or in the background:
 
 # Run as background daemon
 ./examples/plugins/hax_cockpit.py --daemon
+```
+
+---
+
+## 10. Rainbow Mode (`rainbow.py`)
+
+An effects plugin located at `examples/plugins/rainbow.py` that sweeps a smooth
+HSV rainbow across the G510 keyboard backlight (~60 Hz via `g15::kbd_backlight`
+sysfs) and the G502 HERO / SE mouse G logo + DPI stage LEDs (~15 Hz), then parks
+both on an end color (default solid red).
+
+- `--duration SEC` — effect length (default 60)
+- `--speed HZ` — hue cycles per second (default 0.5)
+- `--end-color HEX` — final color, RRGGBB (default `ff0000`)
+- `--no-mouse` — keyboard only
+
+**Mouse LED control** is implemented in `g502_hid.py` via raw HID++ 2.0
+feature `0x8070` (Color LED Effects) `SET_ZONE_EFFECT`, which applies colors
+live to RAM. libratbag instead routes G502 colors through the `0x8100`
+onboard-profiles feature, which the G502 SE firmware only applies on profile
+(re)load — power-on or profile switch — so ratbagd commits appear to do
+nothing until a replug. The rainbow loop uses RAM-only writes (no EEPROM
+wear) and persists just the final color; `g502_deck.py` RGB sync uses the
+same live path. The G502 has two LED zones (logo + DPI bars); the side
+buttons have no LEDs in any G502 variant.
+
+`rainbow.py` falls back to ratbagd onboard-profile painting if the 0x8070
+hidraw path is unavailable. hidraw access for the mouse is granted by the
+`046d:c08b` rule in `70-logitech-g510.rules`.
+
+Run directly, or as a systemd user unit (installed as
+`~/.config/systemd/user/g510-rainbow.service`, not enabled by default):
+
+```bash
+./examples/plugins/rainbow.py --duration 30 --speed 0.75
+systemctl --user daemon-reload
+systemctl --user start g510-rainbow.service
 ```
